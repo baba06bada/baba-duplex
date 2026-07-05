@@ -588,7 +588,7 @@ function stopPlayerEngine() {
   lastPlayheadPosition = -1;
 }
 
-function hlsPlay(videoEl, url, isLive, forceDirect) {
+function hlsPlay(videoEl, url, isLive, proxyIdx) {
   stopPlayerEngine();
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   videoEl.pause();
@@ -597,8 +597,9 @@ function hlsPlay(videoEl, url, isLive, forceDirect) {
   if (isLive) { videoEl.removeAttribute('controls'); }
   else { videoEl.setAttribute('controls', ''); }
 
-  var proxyStreamUrl = forceDirect ? url : proxifyUrl(url);
-  var useProxy = !forceDirect && proxyStreamUrl !== url;
+  proxyIdx = proxyIdx || 0;
+  var proxyStreamUrl = proxifyStreamUrl(url, proxyIdx);
+  var useProxy = proxyStreamUrl !== url;
   var useHls = (typeof Hls !== 'undefined' && Hls.isSupported() && url.indexOf('.m3u8') > 0);
   if (useHls) {
     var hlsConfig = {
@@ -610,14 +611,15 @@ function hlsPlay(videoEl, url, isLive, forceDirect) {
       maxLoadingDelay: isLive ? 4 : 10
     };
     if (useProxy) {
+      var proxyPrefix = proxyStreamUrl.substring(0, proxyStreamUrl.indexOf(encodeURIComponent(url)));
       var DefaultLoader = Hls.DefaultConfig ? Hls.DefaultConfig.loader : null;
       if (DefaultLoader) {
         hlsConfig.loader = function(loaderConfig) {
           var loader = new DefaultLoader(loaderConfig);
           var origLoad = loader.load.bind(loader);
           loader.load = function(context, config, callbacks) {
-            if (context && context.url && needsProxy(context.url) && userProxyUrl) {
-              context.url = userProxyUrl + encodeURIComponent(context.url);
+            if (context && context.url && needsProxy(context.url) && proxyPrefix) {
+              context.url = proxyPrefix + encodeURIComponent(context.url);
             }
             origLoad(context, config, callbacks);
           };
@@ -635,14 +637,14 @@ function hlsPlay(videoEl, url, isLive, forceDirect) {
     hls.on(Hls.Events.ERROR, function(evt, data) {
       if (data.fatal || (isLive && data.type === Hls.ErrorTypes.NETWORK_ERROR)) {
         if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-        if (useProxy && reconnectAttempts < 1) {
-          reconnectAttempts++;
-          showNotification('Proxy 403, direkt deneniyor...');
-          reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive, true); }, 500);
+        if (hasMoreProxies(proxyIdx)) {
+          var next = proxyIdx + 1;
+          showNotification('Baglanti deneniyor (' + (next + 1) + '/...)');
+          reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive, next); }, 500);
         } else if (isLive && reconnectAttempts < RECONNECT_MAX) {
           reconnectAttempts++;
           showNotification('akis yenileniyor (' + reconnectAttempts + '/' + RECONNECT_MAX + ')...');
-          reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive, forceDirect); }, 500);
+          reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive, proxyIdx); }, 500);
         }
       }
     });
@@ -665,6 +667,7 @@ function hlsPlay(videoEl, url, isLive, forceDirect) {
   }
   videoEl._hlsUrl = url;
   videoEl._hlsLive = isLive;
+  videoEl._hlsProxyIdx = proxyIdx;
 
   setupPlayerEvents(videoEl);
 
@@ -679,7 +682,7 @@ function hlsPlay(videoEl, url, isLive, forceDirect) {
             reconnectAttempts++;
             showNotification('akis dondu, yenileniyor (' + reconnectAttempts + '/' + RECONNECT_MAX + ')...');
             if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-            reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive, forceDirect); }, 500);
+            reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive, proxyIdx); }, 500);
           }
         }
       } else { videoEl._stallCount = 0; }
@@ -694,7 +697,7 @@ function hlsOnError() {
     reconnectAttempts++;
     showNotification('akis hatasi, yenileniyor (' + reconnectAttempts + '/' + RECONNECT_MAX + ')...');
     if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-    reconnectTimer = setTimeout(function() { hlsPlay(el, el._hlsUrl, el._hlsLive); }, 500);
+    reconnectTimer = setTimeout(function() { hlsPlay(el, el._hlsUrl, el._hlsLive, el._hlsProxyIdx); }, 500);
   }
 }
 
@@ -706,7 +709,7 @@ function hlsOnStalled() {
       reconnectAttempts++;
       showNotification('akis takildi, yenileniyor (' + reconnectAttempts + '/' + RECONNECT_MAX + ')...');
       if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-      reconnectTimer = setTimeout(function() { hlsPlay(el, el._hlsUrl, el._hlsLive); }, 500);
+      reconnectTimer = setTimeout(function() { hlsPlay(el, el._hlsUrl, el._hlsLive, el._hlsProxyIdx); }, 500);
     }
   }, 1500);
 }
@@ -957,6 +960,10 @@ function resolveArray(data) {
 }
 
 var userProxyUrl = localStorage.getItem('dp_proxyUrl') || '';
+var STREAM_PROXIES = [
+  { url: 'https://api.allorigins.win/raw?url=', encode: true },
+  { url: 'https://api.codetabs.com/v1/proxy/?quest=', encode: true }
+];
 function needsProxy(url) {
   return url && url.indexOf('http') === 0 && location.protocol === 'https:' && url.indexOf('https:') !== 0;
 }
@@ -1004,11 +1011,31 @@ function doXhrDirect(url, callback) {
   xhr.send();
 }
 
-function proxifyUrl(url) {
-  if (needsProxy(url) && userProxyUrl) {
-    return userProxyUrl + encodeURIComponent(url);
+function proxifyUrl(url, proxyOverride) {
+  if (!needsProxy(url)) return url;
+  var p = proxyOverride || userProxyUrl;
+  if (p) return p + encodeURIComponent(url);
+  return url;
+}
+function proxifyStreamUrl(url, idx) {
+  if (!needsProxy(url)) return url;
+  idx = idx || 0;
+  // idx 0: direct (TV'de calisir)
+  if (idx === 0) return url;
+  var pi = idx - 1;
+  // pi 0: user's Cloudflare Worker
+  if (pi === 0 && userProxyUrl) return userProxyUrl + encodeURIComponent(url);
+  if (userProxyUrl) pi--;
+  if (pi >= 0 && pi < STREAM_PROXIES.length) {
+    var sp = STREAM_PROXIES[pi];
+    return sp.encode ? (sp.url + encodeURIComponent(url)) : (sp.url + url);
   }
   return url;
+}
+function hasMoreProxies(idx) {
+  if (!needsProxy('http://x')) return false;
+  var total = 1 + STREAM_PROXIES.length + (userProxyUrl ? 1 : 0);
+  return (idx + 1) < total;
 }
 
 function xtreamApi(action, callback) {
