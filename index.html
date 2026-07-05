@@ -933,20 +933,66 @@ function resolveArray(data) {
   return null;
 }
 
-var CORS_PROXY = 'https://corsproxy.io/?url=';
+var CORS_PROXIES = [
+  'https://corsproxy.io/?url=',
+  'https://api.allorigins.win/raw?url=',
+  'https://api.codetabs.com/v1/proxy?quest='
+];
+var activeProxyIdx = 0;
+function needsProxy(url) {
+  return url && url.indexOf('http') === 0 && location.protocol === 'https:' && url.indexOf('https:') !== 0;
+}
 function proxyUrl(url) {
-  if (url && url.indexOf('http') === 0 && location.protocol === 'https:' && url.indexOf('https:') !== 0) {
-    return CORS_PROXY + encodeURIComponent(url);
-  }
-  return url;
+  if (!needsProxy(url)) return url;
+  return CORS_PROXIES[activeProxyIdx] + encodeURIComponent(url);
+}
+
+function apiRequest(url, callback) {
+  var direct = !needsProxy(url);
+  trySingle(url, 0, direct, callback);
+}
+function trySingle(url, attempt, direct, callback) {
+  var targetUrl = direct ? url : (CORS_PROXIES[attempt] + encodeURIComponent(url));
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', targetUrl, true);
+  xhr.timeout = 15000;
+  xhr.onload = function() {
+    if (xhr.status >= 200 && xhr.status < 300) {
+      callback(xhr.responseText);
+    } else if (!direct && attempt < CORS_PROXIES.length - 1) {
+      trySingle(url, attempt + 1, false, callback);
+    } else {
+      callback(null);
+    }
+  };
+  xhr.onerror = function() {
+    if (direct) {
+      trySingle(url, 0, false, callback);
+    } else if (attempt < CORS_PROXIES.length - 1) {
+      trySingle(url, attempt + 1, false, callback);
+    } else {
+      callback(null);
+    }
+  };
+  xhr.ontimeout = function() {
+    if (!direct && attempt < CORS_PROXIES.length - 1) {
+      trySingle(url, attempt + 1, false, callback);
+    } else {
+      callback(null);
+    }
+  };
+  xhr.send();
 }
 
 function xtreamApi(action, callback) {
   if (!state.api || !state.api.baseUrl) { callback(null); return; }
-  var url = proxyUrl(state.api.baseUrl + '?username=' + state.api.user + '&password=' + state.api.pass + '&' + action);
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', url, true);
-  xhr.timeout = 20000;
+  var url = state.api.baseUrl + '?username=' + state.api.user + '&password=' + state.api.pass + '&' + action;
+  apiRequest(url, function(text) {
+    if (text) {
+      try { callback(JSON.parse(text)); } catch(e) { callback(null); }
+    } else { callback(null); }
+  });
+}
   xhr.onload = function() {
     if (xhr.status >= 200 && xhr.status < 300) {
       try { callback(JSON.parse(xhr.responseText)); } catch(e) { callback(null); }
@@ -986,15 +1032,12 @@ function loadLiveStreams(catId, callback) {
     showLoading();
     var liveApi = state.api;
     if (!liveApi || !liveApi.baseUrl) { state.selectedChannel = 0; if (callback) callback(); return; }
-    var url = proxyUrl(liveApi.baseUrl + '?username=' + liveApi.user + '&password=' + liveApi.pass + '&action=get_live_streams&category_id=' + catId);
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.timeout = 20000;
-    xhr.onload = function() {
+    var url = liveApi.baseUrl + '?username=' + liveApi.user + '&password=' + liveApi.pass + '&action=get_live_streams&category_id=' + catId;
+    apiRequest(url, function(text) {
       try { hideLoading(); } catch(e) {}
-      if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
+      if (text) {
         try {
-          var data = JSON.parse(xhr.responseText);
+          var data = JSON.parse(text);
           var arr = resolveArray(data);
           if (arr && arr.length > 0) {
             state.channels = [];
@@ -1017,10 +1060,7 @@ function loadLiveStreams(catId, callback) {
       }
       state.selectedChannel = 0;
       if (callback) callback();
-    };
-    xhr.onerror = function() { try { hideLoading(); } catch(e) {} state.selectedChannel = 0; if (callback) callback(); };
-    xhr.ontimeout = function() { try { hideLoading(); } catch(e) {} state.selectedChannel = 0; if (callback) callback(); };
-    xhr.send();
+    });
   } catch(e) { showNotification('loadLiveStreams HATA: ' + e.message); state.selectedChannel = 0; if (callback) callback(); }
 }
 
@@ -1103,20 +1143,13 @@ function loadSeries(catId, callback) {
     return;
   }
   showLoading();
-  var url = proxyUrl(state.api.baseUrl + '?username=' + state.api.user + '&password=' + state.api.pass + '&action=get_series&category_id=' + catId);
-  showNotification('Dizi URL: ' + url.substring(0, 80));
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', url, true);
-  xhr.timeout = 20000;
-  xhr.onload = function() {
+  var url = state.api.baseUrl + '?username=' + state.api.user + '&password=' + state.api.pass + '&action=get_series&category_id=' + catId;
+  apiRequest(url, function(text) {
     hideLoading();
-    showNotification('Dizi durum: ' + xhr.status + ' boyut: ' + (xhr.responseText ? xhr.responseText.length : 0));
-    if (xhr.status >= 200 && xhr.status < 300) {
+    if (text) {
       try {
-        var data = JSON.parse(xhr.responseText);
-        showNotification('Dizi JSON tip: ' + (typeof data) + ' array:' + Array.isArray(data));
+        var data = JSON.parse(text);
         var arr = resolveArray(data);
-        showNotification('Dizi arr: ' + (arr ? arr.length : 'null'));
         if (arr) {
           state.contentItems = [];
           for (var i = 0; i < arr.length; i++) {
@@ -1133,13 +1166,10 @@ function loadSeries(catId, callback) {
           state.currentPage = 1;
           state.totalPages = Math.ceil(state.contentItems.length / 12) || 1;
         }
-      } catch(e) { showNotification('Dizi JSON hata: ' + e.message); }
+      } catch(e) {}
     }
     if (callback) callback();
-  };
-  xhr.onerror = function() { hideLoading(); showNotification('Dizi XHR onerror'); if (callback) callback(); };
-  xhr.ontimeout = function() { hideLoading(); showNotification('Dizi XHR timeout'); if (callback) callback(); };
-  xhr.send();
+  });
 }
 
 function loadSeriesSeasons(seriesId, callback) {
@@ -2824,18 +2854,12 @@ function favMgrApi(action, callback) {
   if (!parsed.user && pl.user) parsed.user = pl.user;
   if (!parsed.pass && pl.pass) parsed.pass = pl.pass;
   if (!parsed.baseUrl) { callback(null); return; }
-  var url = proxyUrl(parsed.baseUrl + '?username=' + encodeURIComponent(parsed.user) + '&password=' + encodeURIComponent(parsed.pass) + '&' + action);
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', url, true);
-  xhr.timeout = 20000;
-  xhr.onload = function() {
-    if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
-      try { callback(JSON.parse(xhr.responseText)); } catch(e) { callback(null); }
+  var url = parsed.baseUrl + '?username=' + encodeURIComponent(parsed.user) + '&password=' + encodeURIComponent(parsed.pass) + '&' + action;
+  apiRequest(url, function(text) {
+    if (text) {
+      try { callback(JSON.parse(text)); } catch(e) { callback(null); }
     } else { callback(null); }
-  };
-  xhr.onerror = function() { callback(null); };
-  xhr.ontimeout = function() { callback(null); };
-  xhr.send();
+  });
 }
 
 function showModalLoading() {
