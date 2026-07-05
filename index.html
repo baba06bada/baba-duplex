@@ -934,53 +934,44 @@ function resolveArray(data) {
 }
 
 var CORS_PROXIES = [
-  'https://corsproxy.io/?url=',
-  'https://api.allorigins.win/raw?url=',
-  'https://api.codetabs.com/v1/proxy?quest='
+  'https://cors-anywhere.com/',
+  'https://api.cors.lol/?url=',
+  'https://corsproxy.io/?url='
 ];
-var activeProxyIdx = 0;
 function needsProxy(url) {
   return url && url.indexOf('http') === 0 && location.protocol === 'https:' && url.indexOf('https:') !== 0;
 }
-function proxyUrl(url) {
-  if (!needsProxy(url)) return url;
-  return CORS_PROXIES[activeProxyIdx] + encodeURIComponent(url);
-}
 
 function apiRequest(url, callback) {
-  var direct = !needsProxy(url);
-  trySingle(url, 0, direct, callback);
+  if (!needsProxy(url)) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.timeout = 20000;
+    xhr.onload = function() {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        callback(xhr.responseText);
+      } else { callback(null); }
+    };
+    xhr.onerror = function() { callback(null); };
+    xhr.ontimeout = function() { callback(null); };
+    xhr.send();
+  } else {
+    tryProxy(url, 0, callback);
+  }
 }
-function trySingle(url, attempt, direct, callback) {
-  var targetUrl = direct ? url : (CORS_PROXIES[attempt] + encodeURIComponent(url));
+function tryProxy(url, idx, callback) {
+  if (idx >= CORS_PROXIES.length) { callback(null); return; }
+  var targetUrl = CORS_PROXIES[idx] + encodeURIComponent(url);
   var xhr = new XMLHttpRequest();
   xhr.open('GET', targetUrl, true);
   xhr.timeout = 15000;
   xhr.onload = function() {
     if (xhr.status >= 200 && xhr.status < 300) {
       callback(xhr.responseText);
-    } else if (!direct && attempt < CORS_PROXIES.length - 1) {
-      trySingle(url, attempt + 1, false, callback);
-    } else {
-      callback(null);
-    }
+    } else { tryProxy(url, idx + 1, callback); }
   };
-  xhr.onerror = function() {
-    if (direct) {
-      trySingle(url, 0, false, callback);
-    } else if (attempt < CORS_PROXIES.length - 1) {
-      trySingle(url, attempt + 1, false, callback);
-    } else {
-      callback(null);
-    }
-  };
-  xhr.ontimeout = function() {
-    if (!direct && attempt < CORS_PROXIES.length - 1) {
-      trySingle(url, attempt + 1, false, callback);
-    } else {
-      callback(null);
-    }
-  };
+  xhr.onerror = function() { tryProxy(url, idx + 1, callback); };
+  xhr.ontimeout = function() { tryProxy(url, idx + 1, callback); };
   xhr.send();
 }
 
