@@ -933,9 +933,17 @@ function resolveArray(data) {
   return null;
 }
 
+var CORS_PROXY = 'https://corsproxy.io/?url=';
+function proxyUrl(url) {
+  if (url && url.indexOf('http') === 0 && location.protocol === 'https:' && url.indexOf('https:') !== 0) {
+    return CORS_PROXY + encodeURIComponent(url);
+  }
+  return url;
+}
+
 function xtreamApi(action, callback) {
   if (!state.api || !state.api.baseUrl) { callback(null); return; }
-  var url = state.api.baseUrl + '?username=' + state.api.user + '&password=' + state.api.pass + '&' + action;
+  var url = proxyUrl(state.api.baseUrl + '?username=' + state.api.user + '&password=' + state.api.pass + '&' + action);
   var xhr = new XMLHttpRequest();
   xhr.open('GET', url, true);
   xhr.timeout = 20000;
@@ -978,7 +986,7 @@ function loadLiveStreams(catId, callback) {
     showLoading();
     var liveApi = state.api;
     if (!liveApi || !liveApi.baseUrl) { state.selectedChannel = 0; if (callback) callback(); return; }
-    var url = liveApi.baseUrl + '?username=' + liveApi.user + '&password=' + liveApi.pass + '&action=get_live_streams&category_id=' + catId;
+    var url = proxyUrl(liveApi.baseUrl + '?username=' + liveApi.user + '&password=' + liveApi.pass + '&action=get_live_streams&category_id=' + catId);
     var xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.timeout = 20000;
@@ -1095,7 +1103,7 @@ function loadSeries(catId, callback) {
     return;
   }
   showLoading();
-  var url = state.api.baseUrl + '?username=' + state.api.user + '&password=' + state.api.pass + '&action=get_series&category_id=' + catId;
+  var url = proxyUrl(state.api.baseUrl + '?username=' + state.api.user + '&password=' + state.api.pass + '&action=get_series&category_id=' + catId);
   showNotification('Dizi URL: ' + url.substring(0, 80));
   var xhr = new XMLHttpRequest();
   xhr.open('GET', url, true);
@@ -2816,7 +2824,7 @@ function favMgrApi(action, callback) {
   if (!parsed.user && pl.user) parsed.user = pl.user;
   if (!parsed.pass && pl.pass) parsed.pass = pl.pass;
   if (!parsed.baseUrl) { callback(null); return; }
-  var url = parsed.baseUrl + '?username=' + encodeURIComponent(parsed.user) + '&password=' + encodeURIComponent(parsed.pass) + '&' + action;
+  var url = proxyUrl(parsed.baseUrl + '?username=' + encodeURIComponent(parsed.user) + '&password=' + encodeURIComponent(parsed.pass) + '&' + action);
   var xhr = new XMLHttpRequest();
   xhr.open('GET', url, true);
   xhr.timeout = 20000;
