@@ -934,9 +934,9 @@ function resolveArray(data) {
 }
 
 var CORS_PROXIES = [
-  'https://cors-anywhere.com/',
-  'https://api.cors.lol/?url=',
-  'https://corsproxy.io/?url='
+  {url: 'https://cors-anywhere.com/', encode: false},
+  {url: 'https://api.cors.lol/?url=', encode: false},
+  {url: 'https://corsproxy.io/?url=', encode: true}
 ];
 function needsProxy(url) {
   return url && url.indexOf('http') === 0 && location.protocol === 'https:' && url.indexOf('https:') !== 0;
@@ -961,7 +961,8 @@ function apiRequest(url, callback) {
 }
 function tryProxy(url, idx, callback) {
   if (idx >= CORS_PROXIES.length) { callback(null); return; }
-  var targetUrl = CORS_PROXIES[idx] + encodeURIComponent(url);
+  var p = CORS_PROXIES[idx];
+  var targetUrl = p.encode ? (p.url + encodeURIComponent(url)) : (p.url + url);
   var xhr = new XMLHttpRequest();
   xhr.open('GET', targetUrl, true);
   xhr.timeout = 15000;
