@@ -597,17 +597,35 @@ function hlsPlay(videoEl, url, isLive) {
   if (isLive) { videoEl.removeAttribute('controls'); }
   else { videoEl.setAttribute('controls', ''); }
 
+  var proxyStreamUrl = proxifyUrl(url);
   var useHls = (typeof Hls !== 'undefined' && Hls.isSupported() && url.indexOf('.m3u8') > 0);
   if (useHls) {
-    var hls = new Hls({
+    var hlsConfig = {
       maxBufferLength: isLive ? 6 : 30,
       maxMaxBufferLength: isLive ? 12 : 60,
       enableWorker: false,
       lowLatencyMode: isLive,
       liveDurationInfinity: isLive,
       maxLoadingDelay: isLive ? 4 : 10
-    });
-    hls.loadSource(url);
+    };
+    if (proxyStreamUrl !== url) {
+      var DefaultLoader = Hls.DefaultConfig ? Hls.DefaultConfig.loader : null;
+      if (DefaultLoader) {
+        hlsConfig.loader = function(loaderConfig) {
+          var loader = new DefaultLoader(loaderConfig);
+          var origLoad = loader.load.bind(loader);
+          loader.load = function(context, config, callbacks) {
+            if (context && context.url && needsProxy(context.url) && userProxyUrl) {
+              context.url = userProxyUrl + encodeURIComponent(context.url);
+            }
+            origLoad(context, config, callbacks);
+          };
+          return loader;
+        };
+      }
+    }
+    var hls = new Hls(hlsConfig);
+    hls.loadSource(proxyStreamUrl);
     hls.attachMedia(videoEl);
     hls.on(Hls.Events.MANIFEST_PARSED, function() {
       videoEl.play().catch(function(){});
@@ -625,7 +643,7 @@ function hlsPlay(videoEl, url, isLive) {
     });
     hlsInstance = hls;
   } else {
-    videoEl.src = url;
+    videoEl.src = proxyStreamUrl;
     videoEl.load();
     videoEl.play().catch(function(){});
     startPlayerUpdate();
@@ -980,6 +998,13 @@ function tryProxy(url, idx, callback) {
   xhr.onerror = function() { tryProxy(url, idx + 1, callback); };
   xhr.ontimeout = function() { tryProxy(url, idx + 1, callback); };
   xhr.send();
+}
+
+function proxifyUrl(url) {
+  if (needsProxy(url) && userProxyUrl) {
+    return userProxyUrl + encodeURIComponent(url);
+  }
+  return url;
 }
 
 function xtreamApi(action, callback) {
@@ -3541,7 +3566,7 @@ function getItemIcon(item) {
 
 function resolveIcon(url) {
   if (!url) return '';
-  if (url.indexOf('http') === 0) return url;
+  if (url.indexOf('http') === 0) return proxifyUrl(url);
   if (!state.api || !state.api.baseUrl) return '';
   var base = state.api.baseUrl.replace(/player_api\.php.*$/, '');
   return base + (url.charAt(0) === '/' ? url.substring(1) : url);
