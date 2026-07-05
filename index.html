@@ -588,7 +588,7 @@ function stopPlayerEngine() {
   lastPlayheadPosition = -1;
 }
 
-function hlsPlay(videoEl, url, isLive) {
+function hlsPlay(videoEl, url, isLive, forceDirect) {
   stopPlayerEngine();
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   videoEl.pause();
@@ -597,7 +597,8 @@ function hlsPlay(videoEl, url, isLive) {
   if (isLive) { videoEl.removeAttribute('controls'); }
   else { videoEl.setAttribute('controls', ''); }
 
-  var proxyStreamUrl = proxifyUrl(url);
+  var proxyStreamUrl = forceDirect ? url : proxifyUrl(url);
+  var useProxy = !forceDirect && proxyStreamUrl !== url;
   var useHls = (typeof Hls !== 'undefined' && Hls.isSupported() && url.indexOf('.m3u8') > 0);
   if (useHls) {
     var hlsConfig = {
@@ -608,7 +609,7 @@ function hlsPlay(videoEl, url, isLive) {
       liveDurationInfinity: isLive,
       maxLoadingDelay: isLive ? 4 : 10
     };
-    if (proxyStreamUrl !== url) {
+    if (useProxy) {
       var DefaultLoader = Hls.DefaultConfig ? Hls.DefaultConfig.loader : null;
       if (DefaultLoader) {
         hlsConfig.loader = function(loaderConfig) {
@@ -634,10 +635,14 @@ function hlsPlay(videoEl, url, isLive) {
     hls.on(Hls.Events.ERROR, function(evt, data) {
       if (data.fatal || (isLive && data.type === Hls.ErrorTypes.NETWORK_ERROR)) {
         if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-        if (isLive && reconnectAttempts < RECONNECT_MAX) {
+        if (useProxy && reconnectAttempts < 1) {
+          reconnectAttempts++;
+          showNotification('Proxy 403, direkt deneniyor...');
+          reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive, true); }, 500);
+        } else if (isLive && reconnectAttempts < RECONNECT_MAX) {
           reconnectAttempts++;
           showNotification('akis yenileniyor (' + reconnectAttempts + '/' + RECONNECT_MAX + ')...');
-          reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive); }, 500);
+          reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive, forceDirect); }, 500);
         }
       }
     });
@@ -674,7 +679,7 @@ function hlsPlay(videoEl, url, isLive) {
             reconnectAttempts++;
             showNotification('akis dondu, yenileniyor (' + reconnectAttempts + '/' + RECONNECT_MAX + ')...');
             if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-            reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive); }, 500);
+            reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive, forceDirect); }, 500);
           }
         }
       } else { videoEl._stallCount = 0; }
@@ -952,22 +957,17 @@ function resolveArray(data) {
 }
 
 var userProxyUrl = localStorage.getItem('dp_proxyUrl') || '';
-var CORS_PROXIES = [
-  {url: 'https://cors-anywhere.com/', encode: false},
-  {url: 'https://api.cors.lol/?url=', encode: false},
-  {url: 'https://corsproxy.io/?', encode: false}
-];
 function needsProxy(url) {
   return url && url.indexOf('http') === 0 && location.protocol === 'https:' && url.indexOf('https:') !== 0;
 }
 
 function apiRequest(url, callback) {
-  if (!needsProxy(url)) {
-    doXhr(url, callback);
-  } else if (userProxyUrl) {
+  if (needsProxy(url) && userProxyUrl) {
     doXhr(userProxyUrl + encodeURIComponent(url), callback);
+  } else if (needsProxy(url)) {
+    doXhrDirect(url, callback);
   } else {
-    tryProxy(url, 0, callback);
+    doXhr(url, callback);
   }
 }
 function doXhr(targetUrl, callback) {
@@ -983,20 +983,24 @@ function doXhr(targetUrl, callback) {
   xhr.ontimeout = function() { callback(null); };
   xhr.send();
 }
-function tryProxy(url, idx, callback) {
-  if (idx >= CORS_PROXIES.length) { callback(null); return; }
-  var p = CORS_PROXIES[idx];
-  var targetUrl = p.encode ? (p.url + encodeURIComponent(url)) : (p.url + url);
+function doXhrDirect(url, callback) {
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', targetUrl, true);
+  xhr.open('GET', url, true);
   xhr.timeout = 15000;
   xhr.onload = function() {
     if (xhr.status >= 200 && xhr.status < 300) {
       callback(xhr.responseText);
-    } else { tryProxy(url, idx + 1, callback); }
+    } else { callback(null); }
   };
-  xhr.onerror = function() { tryProxy(url, idx + 1, callback); };
-  xhr.ontimeout = function() { tryProxy(url, idx + 1, callback); };
+  xhr.onerror = function() {
+    if (userProxyUrl) {
+      doXhr(userProxyUrl + encodeURIComponent(url), callback);
+    } else {
+      callback(null);
+      showNotification('Proxy gerekli: Ayarlar > Genel Ayarlar > Vekil Sunucu URL');
+    }
+  };
+  xhr.ontimeout = function() { callback(null); };
   xhr.send();
 }
 
