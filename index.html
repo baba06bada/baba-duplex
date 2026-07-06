@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BabaBada</title>
+<title>babaplayer</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -330,7 +330,7 @@ body{background:#0a1628}
         <polygon points="2,2 20,18 2,34" fill="#4CAF50"/>
         <polygon points="14,2 32,18 14,34" fill="#e91e63"/>
       </svg>
-      <span>Baba<span class="lp">Bada</span></span>
+      <span>babaplayer</span>
     </div>
     <div class="breadcrumb" id="breadcrumb">Calma listeleri</div>
     <input type="text" class="header-search" id="search-input" placeholder="Ara..." onkeydown="if(event.keyCode===13)doSearch()">
@@ -1370,7 +1370,7 @@ function renderMainMenu(el) {
 
 function setFooterMain() {
   var f = document.getElementById('footer-content');
-  f.innerHTML = '<div class="footer-hint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Acik</div><div class="footer-sep"></div><div class="footer-btn" style="border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#aab" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Oynatma Listesi Durumu</div>';
+  f.innerHTML = '<div class="footer-hint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Acik</div><div class="footer-sep"></div><div class="footer-btn" onclick="showPlaylistStatus()" style="border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#aab" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Oynatma Listesi Durumu</div>';
 }
 
 function setFooterDefault() {
@@ -2440,7 +2440,13 @@ function renderLive(el) {
   html += '<div class="live-epg"><div class="live-epg-title">EPG verisi yok</div></div>';
   html += '<div class="live-epg-btn">EPG Zaman Cizelgesi</div>';
   html += '</div></div>';
+  var liveChannelsScroll = el.querySelector('.live-channels');
+  var savedScrollTop = liveChannelsScroll ? liveChannelsScroll.scrollTop : 0;
   el.innerHTML = html;
+  if (savedScrollTop) {
+    var newLc = el.querySelector('.live-channels');
+    if (newLc) newLc.scrollTop = savedScrollTop;
+  }
   if (channels.length > 0 && ch.stream_id) {
     playLivePreview(ch);
   }
@@ -3174,6 +3180,37 @@ function showHttpsGuide() {
   showModal(html);
 }
 
+function showPlaylistStatus() {
+  var api = state.api || {};
+  var pl = state.playlists && state.playlists.length > 0 ? state.playlists[state.selectedPlaylist || 0] : null;
+  var liveCount = state.channels ? state.channels.length : 0;
+  var catCount = state.categories ? state.categories.length : 0;
+  var itemCount = state.contentItems ? state.contentItems.length : 0;
+  var html = '<div class="modal-header" style="background:rgba(20,60,120,0.95)">Oynatma Listesi Durumu</div>';
+  html += '<div class="modal-body" style="background:rgba(10,20,50,0.95);padding:20px;color:#ccc;font-size:13px;line-height:2">';
+  if (pl) {
+    html += '<div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:12px;margin-bottom:12px">';
+    html += '<div><b style="color:#fff">' + esc(pl.name || '') + '</b></div>';
+    html += '<div style="font-size:11px;color:#889;word-break:break-all">' + esc(pl.url || '') + '</div>';
+    html += '</div>';
+  }
+  html += '<table style="width:100%;border-collapse:collapse">';
+  html += '<tr><td style="padding:4px 8px;color:#889">Sunucu</td><td style="padding:4px 8px;color:#fff;text-align:right;word-break:break-all">' + esc(api.host || '-') + '</td></tr>';
+  html += '<tr><td style="padding:4px 8px;color:#889">Kullanici</td><td style="padding:4px 8px;color:#fff;text-align:right">' + esc(api.user || '-') + '</td></tr>';
+  html += '<tr><td style="padding:4px 8px;color:#889">Durum</td><td style="padding:4px 8px;color:#4CAF50;text-align:right">Bagli</td></tr>';
+  html += '<tr><td style="padding:4px 8px;color:#889">Canli Kanal Sayisi</td><td style="padding:4px 8px;color:#fff;text-align:right">' + (state.channelCount || liveCount || '?') + '</td></tr>';
+  html += '<tr><td style="padding:4px 8px;color:#889">Kategori Sayisi</td><td style="padding:4px 8px;color:#fff;text-align:right">' + catCount + '</td></tr>';
+  html += '<tr><td style="padding:4px 8px;color:#889">Film/Dizi Sayisi</td><td style="padding:4px 8px;color:#fff;text-align:right">' + itemCount + '</td></tr>';
+  html += '<tr><td style="padding:4px 8px;color:#889">Proxy</td><td style="padding:4px 8px;color:#889;text-align:right;font-size:11px;word-break:break-all">' + esc(userProxyUrl || '-') + '</td></tr>';
+  html += '</table>';
+  html += '<div style="margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;color:#667">';
+  html += '<div>babaplayer v1.0</div>';
+  html += '</div>';
+  html += '</div>';
+  html += '<div class="modal-footer" style="background:rgba(10,20,50,0.95);padding:12px"><button class="modal-close" onclick="closeModal()">Kapat</button></div>';
+  showModal(html);
+}
+
 function openSetting(type) {
   if (type === 'g') showGeneralSettings();
   else if (type === 'v') showVideoSettings();
@@ -3646,12 +3683,12 @@ document.getElementById('modal-overlay').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
 function tvInit() {
-  var els = document.querySelectorAll('.footer-btn, .fav-modal-item, .settings-row, .settings-tile, .pl-side-btn, .fav-mgr-list-item, .fav-mgr-tbtn, .fav-mgr-panel-header, .modal-close, .modal-save, .modal-cancel, .pq-btn, .pa-btn, .pl-recent-item, .header-search, ' + '#btn-back, #btn-search');
+  var els = document.querySelectorAll('.footer-btn, .fav-modal-item, .settings-row, .settings-tile, .pl-side-btn, .fav-mgr-list-item, .fav-mgr-tbtn, .fav-mgr-panel-header, .modal-close, .modal-save, .modal-cancel, .pq-btn, .pa-btn, .pl-recent-item, #btn-back, #btn-search');
   for (var i = 0; i < els.length; i++) {
     if (!els[i].hasAttribute('tabindex')) els[i].setAttribute('tabindex', '0');
   }
   if (document.activeElement === document.body) {
-    var first = document.querySelector('[tabindex="0"]:not([tabindex="-1"])');
+    var first = document.querySelector('[tabindex="0"]:not([tabindex="-1"]):not(input):not(textarea)');
     if (first) first.focus();
   }
 }
