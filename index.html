@@ -626,29 +626,16 @@ function hlsPlay(videoEl, url, isLive) {
     });
     hlsInstance = hls;
   } else {
-    var loadAttempt = 0;
-    var maxAttempts = userProxyUrl ? 2 : 1;
-    function doLoad() {
-      loadAttempt++;
-      var useProxy = (userProxyUrl && loadAttempt === 1);
-      var playUrl = useProxy ? proxifyUrl(url) : url;
-      console.log('Movie URL ' + (useProxy ? 'via proxy' : 'direct') + ':', playUrl);
-      videoEl.src = playUrl;
-      videoEl.load();
-      videoEl.play().catch(function(err){
-        if (err) showNotification('Video hatasi: ' + (err.message || err));
-        if (useProxy && loadAttempt < maxAttempts) { setTimeout(doLoad, 500); }
-      });
-      videoEl.onerror = function() {
-        var msg = videoEl.error ? (videoEl.error.code + ': ' + videoEl.error.message) : 'bilinmeyen hata';
-        showNotification('Video yukleme hatasi (' + url.substring(0,50) + '...): ' + msg);
-        if (useProxy && loadAttempt < maxAttempts) {
-          videoEl.onerror = null;
-          setTimeout(doLoad, 500);
-        }
-      };
-    }
-    doLoad();
+    var playUrl = proxifyUrl(url);
+    console.log('Movie URL:', playUrl);
+    videoEl.src = playUrl;
+    videoEl.load();
+    videoEl.play().catch(function(err){
+      if (err) showNotification('Video hatasi: ' + (err.message || err));
+    });
+    videoEl.onerror = function() {
+      showNotification('Video engellendi. Cozum: chrome://settings/content/insecureContent adresine gidip Allow bolumune bu siteyi ekleyin');
+    };
     startPlayerUpdate();
   }
 
@@ -3258,7 +3245,10 @@ function showGeneralSettings() {
   html += '<div class="settings-row" onclick="showThumbnailQuality()" style="cursor:pointer"><div class="settings-label">Kucuk Resim Kapak Resimleri Kalitesi</div><div class="settings-value" id="thumb-quality-val">Orta</div></div>';
   html += '<div class="settings-row" onclick="showSortType()" style="cursor:pointer"><div class="settings-label">Oynatma Listeleri Siralama Turu</div><div class="settings-value" id="sort-val">' + (state.sortType || 'Varsayilan') + '</div></div>';
   html += '<div class="settings-row" onclick="showZoomSelect()" style="cursor:pointer"><div class="settings-label">Yakinlastirma</div><div class="settings-value" id="zoom-val">%' + Math.round((state.zoomLevel || 1) * 100) + '</div></div>';
-  html += '<div class="settings-row" onclick="showProxySetting()" style="cursor:pointer"><div class="settings-label">Proxy URL (PC/tablet icin)</div><div class="settings-value" id="proxy-val" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (userProxyUrl || 'Varsayilan') + '</div></div>';
+   html += '<div class="settings-row" onclick="showProxySetting()" style="cursor:pointer"><div class="settings-label">Vekil Sunucu URL</div><div class="settings-value" id="proxy-val" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (userProxyUrl || 'Varsayilan') + '</div></div>';
+  if (location.protocol === 'https:') {
+    html += '<div class="settings-row" onclick="window.open(\'chrome://settings/content/insecureContent\')" style="cursor:pointer"><div class="settings-label" style="color:#ff9800">⚠ PC/Tablet: Video Cozumu</div><div class="settings-value">Chrome ayarlari ac</div></div>';
+  }
   html += '<div class="settings-row"><div class="settings-label">Uygulama klavyesini kullan</div><div class="settings-toggle" onclick="toggleSwitch(this)"><span class="toggle-label">OFF</span></div></div>';
   html += '</div></div>';
   html += '<div class="modal-footer" style="background:rgba(10,20,50,0.85);padding:12px 16px"><button class="modal-close" style="width:180px;height:42px;font-size:16px;padding:0" onclick="closeModal()">Kapat</button></div>';
