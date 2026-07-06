@@ -1197,11 +1197,8 @@ function getStreamUrl(type, streamId, ext) {
   var base = state.api.baseUrl.replace('player_api.php', '');
   if (type === 'live') {
     return base + 'live/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.m3u8';
-  } else {
-    var safeExt = ext || 'mp4';
-    if (safeExt === 'mkv' || safeExt === 'avi' || safeExt === 'ts') safeExt = 'm3u8';
-    return base + type + '/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.' + safeExt;
   }
+  return base + type + '/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.m3u8';
 }
 
 function deletePlaylist(i) {
