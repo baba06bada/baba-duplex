@@ -626,15 +626,14 @@ function hlsPlay(videoEl, url, isLive) {
     });
     hlsInstance = hls;
   } else {
-    var playUrl = proxifyUrl(url);
-    console.log('Movie URL:', playUrl);
-    videoEl.src = playUrl;
+    console.log('Movie URL:', url);
+    videoEl.src = url;
     videoEl.load();
     videoEl.play().catch(function(err){
       if (err) showNotification('Video hatasi: ' + (err.message || err));
     });
     videoEl.onerror = function() {
-      showNotification('Video engellendi. Cozum: chrome://settings/content/insecureContent adresine gidip Allow bolumune bu siteyi ekleyin');
+      showNotification('Video oynatilamadi. Cozum: chrome://settings/content/insecureContent adresine gidip Allow ekleyin');
     };
     startPlayerUpdate();
   }
@@ -1199,9 +1198,13 @@ function getStreamUrl(type, streamId, ext) {
   if (type === 'live') {
     return base + 'live/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.m3u8';
   } else if (type === 'movie') {
-    return base + 'movie/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.' + (ext || 'mp4');
+    var safeExt = (ext || 'mp4');
+    if (safeExt !== 'mp4' && safeExt !== 'm3u8') safeExt = 'mp4';
+    return base + 'movie/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.' + safeExt;
   } else if (type === 'series') {
-    return base + 'series/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.' + (ext || 'mp4');
+    var safeExt = (ext || 'mp4');
+    if (safeExt !== 'mp4' && safeExt !== 'm3u8') safeExt = 'mp4';
+    return base + 'series/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.' + safeExt;
   }
   return '';
 }
