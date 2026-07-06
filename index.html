@@ -633,7 +633,7 @@ function hlsPlay(videoEl, url, isLive) {
       if (err) showNotification('Video hatasi: ' + (err.message || err));
     });
     videoEl.onerror = function() {
-      showNotification('Video oynatilamadi. Cozum: chrome://settings/content/insecureContent adresine gidip Allow ekleyin');
+      showNotification('Karistirilmis Icerik HATASI: HTTPS sayfasinda HTTP video oynatilamiyor. Ayarlari acin.');
     };
     startPlayerUpdate();
   }
@@ -940,7 +940,8 @@ function resolveArray(data) {
   return null;
 }
 
-var userProxyUrl = localStorage.getItem('dp_proxyUrl') || '';
+var WORKER_URL = 'https://small-poetry-287c.f3baba06.workers.dev/?url=';
+var userProxyUrl = localStorage.getItem('dp_proxyUrl') || WORKER_URL;
 function needsProxy(url) {
   return url && url.indexOf('http') === 0 && location.protocol === 'https:' && url.indexOf('https:') !== 0;
 }
@@ -1195,8 +1196,10 @@ function loadSeriesSeasons(seriesId, callback) {
 function getStreamUrl(type, streamId, ext) {
   if (!state.api || !state.api.baseUrl) return '';
   var base = state.api.baseUrl.replace('player_api.php', '');
-  var raw = base + type + '/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.' + (ext || 'mp4');
-  return proxifyUrl(raw);
+  if (type === 'live') {
+    return base + 'live/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.m3u8';
+  }
+  return base + type + '/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.' + (ext || 'mp4');
 }
 
 function deletePlaylist(i) {
@@ -3092,6 +3095,48 @@ function getSettingsIcon(type) {
   return '';
 }
 
+function showHttpsGuide() {
+  var ua = navigator.userAgent || '';
+  var isTV = /Web0S|WebOS|LG|NetCast|SmartTV|Tizen|Opera TV|Headless/i.test(ua);
+  var isKiwi = /Kiwi/i.test(ua);
+  var html = '<div class="modal-header" style="background:rgba(20,60,120,0.95)">HTTPS Ayar Kılavuzu</div>';
+  html += '<div class="modal-body" style="background:rgba(10,20,50,0.95);padding:20px;color:#ccc;font-size:14px;line-height:1.7">';
+  html += '<div style="background:rgba(255,152,0,0.15);border:1px solid rgba(255,152,0,0.4);border-radius:6px;padding:12px;margin-bottom:16px">';
+  html += '<b style="color:#ff9800">Neden bu kılavuz?</b><br>Sunucu sadece HTTP uzerinden video verir. HTTPS sayfadan HTTP video acmak icin tarayicida "Guvenilmeyen Icerige Izin Ver" acilmalidir.';
+  html += '</div>';
+  if (isTV) {
+    html += '<div style="color:#4CAF50;font-weight:bold;font-size:16px;margin-bottom:12px">LG TV</div>';
+    html += '<p>LG TV tarayicisi karistirilmis icerige otomatik izin verir. Sadece TV aygitlarindan HTTPS uzerinden giris yapmaniz yeterlidir.</p>';
+    html += '<p style="margin-top:8px;color:#4CAF50"><b>Dikkat:</b> TV\'de sorun yasarsaniz, TV ayarlarindan "Gelistirici Secenekler" > "Icerik Kısıtlamalari" kapatmayi deneyin.</p>';
+  } else if (isKiwi) {
+    html += '<div style="color:#4CAF50;font-weight:bold;font-size:16px;margin-bottom:12px">Kiwi Browser (Android Tablet)</div>';
+    html += '<p><b>Adim 1:</b> Asagidaki butona tiklayin VEYA adres cubuguna soyle yazin:</p>';
+    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0;word-break:break-all">chrome://settings/content/insecureContent</div>';
+    html += '<p><b>Adim 2:</b> "Ekle" butonuna basin</p>';
+    html += '<p><b>Adim 3:</b> Site adresine yazin:</p>';
+    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0">baba06bada.github.io</div>';
+    html += '<p><b>Adim 4:</b> "Izin Ver" secin</p>';
+    html += '<p><b>Adim 5:</b> Sayfayi yenileyin</p>';
+    html += '<div style="margin-top:12px;text-align:center">';
+    html += '<button onclick="try{window.open(\'chrome://settings/content/insecureContent\')}catch(e){showNotification(\'Yeni sekmede acin\')}" style="padding:12px 24px;border:none;border-radius:6px;background:#4a90d9;color:#fff;font-size:14px;cursor:pointer">chrome://settings Ac</button>';
+    html += '</div>';
+  } else {
+    html += '<div style="color:#4CAF50;font-weight:bold;font-size:16px;margin-bottom:12px">PC Chrome/Edge</div>';
+    html += '<p><b>Adim 1:</b> Adres cubuguna soyle yazin:</p>';
+    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0">chrome://settings/content/insecureContent</div>';
+    html += '<p><b>Adim 2:</b> "Ekle" butonuna basin</p>';
+    html += '<p><b>Adim 3:</b> Site adresine yazin:</p>';
+    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0">baba06bada.github.io</div>';
+    html += '<p><b>Adim 4:</b> "Izin Ver" secin, sayfayi yenileyin</p>';
+    html += '<div style="margin-top:12px;text-align:center">';
+    html += '<button onclick="try{window.open(\'chrome://settings/content/insecureContent\')}catch(e){showNotification(\'Yeni sekmede acin\')}" style="padding:12px 24px;border:none;border-radius:6px;background:#4a90d9;color:#fff;font-size:14px;cursor:pointer">chrome://settings Ac</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+  html += '<div class="modal-footer" style="background:rgba(10,20,50,0.95);padding:12px"><button class="modal-close" style="width:180px;height:42px;font-size:16px;padding:0" onclick="closeModal()">Tamam</button></div>';
+  showModal(html);
+}
+
 function openSetting(type) {
   if (type === 'g') showGeneralSettings();
   else if (type === 'v') showVideoSettings();
@@ -3238,10 +3283,8 @@ function showGeneralSettings() {
   html += '<div class="settings-row" onclick="showThumbnailQuality()" style="cursor:pointer"><div class="settings-label">Kucuk Resim Kapak Resimleri Kalitesi</div><div class="settings-value" id="thumb-quality-val">Orta</div></div>';
   html += '<div class="settings-row" onclick="showSortType()" style="cursor:pointer"><div class="settings-label">Oynatma Listeleri Siralama Turu</div><div class="settings-value" id="sort-val">' + (state.sortType || 'Varsayilan') + '</div></div>';
   html += '<div class="settings-row" onclick="showZoomSelect()" style="cursor:pointer"><div class="settings-label">Yakinlastirma</div><div class="settings-value" id="zoom-val">%' + Math.round((state.zoomLevel || 1) * 100) + '</div></div>';
-   html += '<div class="settings-row" onclick="showProxySetting()" style="cursor:pointer"><div class="settings-label">Vekil Sunucu URL</div><div class="settings-value" id="proxy-val" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (userProxyUrl || 'Varsayilan') + '</div></div>';
-  if (location.protocol === 'https:') {
-    html += '<div class="settings-row" onclick="window.open(\'chrome://settings/content/insecureContent\')" style="cursor:pointer"><div class="settings-label" style="color:#ff9800">⚠ PC/Tablet: Video Cozumu</div><div class="settings-value">Chrome ayarlari ac</div></div>';
-  }
+   html += '<div class="settings-row" onclick="showProxySetting()" style="cursor:pointer"><div class="settings-label">Vekil Sunucu URL</div><div class="settings-value" id="proxy-val" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (userProxyUrl || 'Otomatik') + '</div></div>';
+   html += '<div class="settings-row" onclick="showHttpsGuide()" style="cursor:pointer"><div class="settings-label" style="color:#ff9800">HTTPS Video Ayarlari</div><div class="settings-value" style="color:#ff9800">Kilavuz</div></div>';
   html += '<div class="settings-row"><div class="settings-label">Uygulama klavyesini kullan</div><div class="settings-toggle" onclick="toggleSwitch(this)"><span class="toggle-label">OFF</span></div></div>';
   html += '</div></div>';
   html += '<div class="modal-footer" style="background:rgba(10,20,50,0.85);padding:12px 16px"><button class="modal-close" style="width:180px;height:42px;font-size:16px;padding:0" onclick="closeModal()">Kapat</button></div>';
@@ -3581,6 +3624,15 @@ loadPlaylists();
 state.screen = 'playlists';
 applyAutoScale();
 renderScreen();
+
+if (location.protocol === 'https:') {
+  try {
+    if (!localStorage.getItem('dp_httpsGuideShown')) {
+      localStorage.setItem('dp_httpsGuideShown', '1');
+      setTimeout(function() { showHttpsGuide(); }, 1500);
+    }
+  } catch(e) {}
+}
 </script>
 <div class="loading" id="loading"><div class="loading-spin"></div></div>
 </body>
