@@ -370,7 +370,7 @@ body{background:#0a1628}
       Ayarlar
     </div>
     </div>
-    <div class="footer-lock">
+    <div class="footer-lock" id="footer-https-indicator" onclick="showHttpsGuide()" title="HTIPS ayarlari" style="cursor:pointer;display:none">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4" fill="none" stroke="#fff" stroke-width="2"/></svg>
     </div>
   </div>
@@ -617,7 +617,18 @@ function hlsPlay(videoEl, url, isLive) {
     hls.on(Hls.Events.ERROR, function(evt, data) {
       if (data.fatal || (isLive && data.type === Hls.ErrorTypes.NETWORK_ERROR)) {
         if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-        if (isLive && reconnectAttempts < RECONNECT_MAX) {
+        var isProxied = (url.indexOf(WORKER_URL) === 0);
+        if (!isProxied && !hls._proxyTried) {
+          hls._proxyTried = true;
+          var pu = WORKER_URL + encodeURIComponent(url);
+          setTimeout(function() { hlsPlay(videoEl, pu, isLive); }, 200);
+          return;
+        }
+        if (!hls._guideShown) {
+          hls._guideShown = true;
+          showHttpsGuide();
+        }
+        if (!isProxied && isLive && reconnectAttempts < RECONNECT_MAX) {
           reconnectAttempts++;
           showNotification('akis yenileniyor (' + reconnectAttempts + '/' + RECONNECT_MAX + ')...');
           reconnectTimer = setTimeout(function() { hlsPlay(videoEl, url, isLive); }, 500);
@@ -626,14 +637,34 @@ function hlsPlay(videoEl, url, isLive) {
     });
     hlsInstance = hls;
   } else {
-    console.log('Movie URL:', url);
+    videoEl._fallbackTried = false;
+    videoEl._guideShown = false;
     videoEl.src = url;
     videoEl.load();
+    var tryPlay = function(vid, src, showGuide) {
+      vid.src = src;
+      vid.load();
+      vid.play().catch(function(){
+        if (showGuide && !vid._guideShown) {
+          vid._guideShown = true;
+          showHttpsGuide();
+        }
+      });
+    };
     videoEl.play().catch(function(err){
-      if (err) showNotification('Video hatasi: ' + (err.message || err));
+      if (!videoEl._fallbackTried) {
+        videoEl._fallbackTried = true;
+        tryPlay(videoEl, WORKER_URL + encodeURIComponent(url), true);
+      }
     });
     videoEl.onerror = function() {
-      showNotification('Karistirilmis Icerik HATASI: HTTPS sayfasinda HTTP video oynatilamiyor. Ayarlari acin.');
+      if (!videoEl._fallbackTried) {
+        videoEl._fallbackTried = true;
+        tryPlay(videoEl, WORKER_URL + encodeURIComponent(url), true);
+      } else if (!videoEl._guideShown) {
+        videoEl._guideShown = true;
+        showHttpsGuide();
+      }
     };
     startPlayerUpdate();
   }
@@ -3099,37 +3130,32 @@ function showHttpsGuide() {
   var ua = navigator.userAgent || '';
   var isTV = /Web0S|WebOS|LG|NetCast|SmartTV|Tizen|Opera TV|Headless/i.test(ua);
   var isKiwi = /Kiwi/i.test(ua);
+  var curDomain = location.hostname.replace('www.', '');
+  var otherDomain = curDomain.indexOf('github') >= 0 ? 'baba06bada.infinityfreeapp.com' : 'baba06bada.github.io';
   var html = '<div class="modal-header" style="background:rgba(20,60,120,0.95)">HTTPS Ayar Kılavuzu</div>';
   html += '<div class="modal-body" style="background:rgba(10,20,50,0.95);padding:20px;color:#ccc;font-size:14px;line-height:1.7">';
   html += '<div style="background:rgba(255,152,0,0.15);border:1px solid rgba(255,152,0,0.4);border-radius:6px;padding:12px;margin-bottom:16px">';
-  html += '<b style="color:#ff9800">Neden bu kılavuz?</b><br>Sunucu sadece HTTP uzerinden video verir. HTTPS sayfadan HTTP video acmak icin tarayicida "Guvenilmeyen Icerige Izin Ver" acilmalidir.';
+  html += '<b style="color:#ff9800">Film ve diziler neden calismiyor?</b><br>';
+  html += 'Video sunucusu yalnizca HTTP uzerinden yayin yapar. HTTPS bir sayfada HTTP video oynatmak icin tarayicida <b>"Guvenli Olmayan Icerige Izin Ver"</b> ayarinin acilmasi gerekir.';
   html += '</div>';
   if (isTV) {
     html += '<div style="color:#4CAF50;font-weight:bold;font-size:16px;margin-bottom:12px">LG TV</div>';
-    html += '<p>LG TV tarayicisi karistirilmis icerige otomatik izin verir. Sadece TV aygitlarindan HTTPS uzerinden giris yapmaniz yeterlidir.</p>';
-    html += '<p style="margin-top:8px;color:#4CAF50"><b>Dikkat:</b> TV\'de sorun yasarsaniz, TV ayarlarindan "Gelistirici Secenekler" > "Icerik Kısıtlamalari" kapatmayi deneyin.</p>';
-  } else if (isKiwi) {
-    html += '<div style="color:#4CAF50;font-weight:bold;font-size:16px;margin-bottom:12px">Kiwi Browser (Android Tablet)</div>';
-    html += '<p><b>Adim 1:</b> Asagidaki butona tiklayin VEYA adres cubuguna soyle yazin:</p>';
-    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0;word-break:break-all">chrome://settings/content/insecureContent</div>';
-    html += '<p><b>Adim 2:</b> "Ekle" butonuna basin</p>';
-    html += '<p><b>Adim 3:</b> Site adresine yazin:</p>';
-    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0">baba06bada.github.io</div>';
-    html += '<p><b>Adim 4:</b> "Izin Ver" secin</p>';
-    html += '<p><b>Adim 5:</b> Sayfayi yenileyin</p>';
-    html += '<div style="margin-top:12px;text-align:center">';
-    html += '<button onclick="try{window.open(\'chrome://settings/content/insecureContent\')}catch(e){showNotification(\'Yeni sekmede acin\')}" style="padding:12px 24px;border:none;border-radius:6px;background:#4a90d9;color:#fff;font-size:14px;cursor:pointer">chrome://settings Ac</button>';
-    html += '</div>';
+    html += '<p>LG TV tarayicisi karistirilmis icerige otomatik izin verir. Filmler ve diziler calismali.</p>';
+    html += '<p style="margin-top:8px">Calismazsa: LG TV ayarlari > Gelistirici Secenekler > Icerik Kisitlamalari kapatmayi deneyin.</p>';
   } else {
-    html += '<div style="color:#4CAF50;font-weight:bold;font-size:16px;margin-bottom:12px">PC Chrome/Edge</div>';
-    html += '<p><b>Adim 1:</b> Adres cubuguna soyle yazin:</p>';
-    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0">chrome://settings/content/insecureContent</div>';
-    html += '<p><b>Adim 2:</b> "Ekle" butonuna basin</p>';
-    html += '<p><b>Adim 3:</b> Site adresine yazin:</p>';
-    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0">baba06bada.github.io</div>';
-    html += '<p><b>Adim 4:</b> "Izin Ver" secin, sayfayi yenileyin</p>';
+    var browserName = isKiwi ? 'Kiwi Browser (Android Tablet)' : 'PC Chrome/Edge';
+    html += '<div style="color:#4CAF50;font-weight:bold;font-size:16px;margin-bottom:12px">' + browserName + '</div>';
+    html += '<p style="margin-bottom:8px"><b>Adim 1:</b> Yeni bir sekme acin ve adres cubuguna soyle yazin (veya asagidaki butona tiklayin):</p>';
+    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0;word-break:break-all">chrome://settings/content/insecureContent</div>';
+    html += '<p style="margin-bottom:8px"><b>Adim 2:</b> "Ekle" butonuna basin</p>';
+    html += '<p style="margin-bottom:8px"><b>Adim 3:</b> Site adresine asagidakilerden birini yazin (hangi sitedeyseniz):</p>';
+    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0">' + curDomain + '</div>';
+    html += '<p style="margin-bottom:8px">Eger diger sitede de kullanacaksaniz, ikinci siteyi de ekleyin:</p>';
+    html += '<div style="background:rgba(255,255,255,0.1);padding:8px 12px;border-radius:4px;font-family:monospace;color:#5599ee;margin:8px 0">' + otherDomain + '</div>';
+    html += '<p style="margin-bottom:8px"><b>Adim 4:</b> "Izin Ver" secin</p>';
+    html += '<p style="margin-bottom:8px"><b>Adim 5:</b> Bu sayfaya geri donun ve yenileyin (F5)</p>';
     html += '<div style="margin-top:12px;text-align:center">';
-    html += '<button onclick="try{window.open(\'chrome://settings/content/insecureContent\')}catch(e){showNotification(\'Yeni sekmede acin\')}" style="padding:12px 24px;border:none;border-radius:6px;background:#4a90d9;color:#fff;font-size:14px;cursor:pointer">chrome://settings Ac</button>';
+    html += '<button onclick="try{window.open(\'chrome://settings/content/insecureContent\',\'_blank\')}catch(e){showNotification(\'Adres cubuguna chrome://settings/content/insecureContent yazin\')}" style="padding:12px 24px;border:none;border-radius:6px;background:#4a90d9;color:#fff;font-size:14px;cursor:pointer">chrome://settings Ac (yeni sekme)</button>';
     html += '</div>';
   }
   html += '</div>';
@@ -3626,10 +3652,12 @@ applyAutoScale();
 renderScreen();
 
 if (location.protocol === 'https:') {
+  var hi = document.getElementById('footer-https-indicator');
+  if (hi) hi.style.display = '';
   try {
-    if (!localStorage.getItem('dp_httpsGuideShown')) {
-      localStorage.setItem('dp_httpsGuideShown', '1');
-      setTimeout(function() { showHttpsGuide(); }, 1500);
+    if (!sessionStorage.getItem('dp_httpsGuideShown')) {
+      sessionStorage.setItem('dp_httpsGuideShown', '1');
+      setTimeout(function() { showHttpsGuide(); }, 2000);
     }
   } catch(e) {}
 }
