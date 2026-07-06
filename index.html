@@ -1195,10 +1195,8 @@ function loadSeriesSeasons(seriesId, callback) {
 function getStreamUrl(type, streamId, ext) {
   if (!state.api || !state.api.baseUrl) return '';
   var base = state.api.baseUrl.replace('player_api.php', '');
-  if (type === 'live') {
-    return base + 'live/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.m3u8';
-  }
-  return base + type + '/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.m3u8';
+  var raw = base + type + '/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.' + (ext || 'mp4');
+  return proxifyUrl(raw);
 }
 
 function deletePlaylist(i) {
