@@ -3022,26 +3022,26 @@ function favModalBack() {
 
 function showFavGroupSelect() {
   var groups = ['Favoriler / Favorites 1','Favoriler / Favorites 2','Favoriler / Favorites 3','Favoriler / Favorites 4','Favoriler / Favorites 5'];
-  var html = '<div style="padding:8px">';
-  html += '<div style="color:#aaa;font-size:11px;margin-bottom:10px">Sik kullanilanlar grubunu secin</div>';
-  html += '<div class="fav-modal-grid">';
+  var innerHtml = '<div style="padding:8px">';
+  innerHtml += '<div style="color:#aaa;font-size:11px;margin-bottom:10px">Sik kullanilanlar grubunu secin</div>';
+  innerHtml += '<div class="fav-modal-grid">';
   for (var i = 0; i < groups.length; i++) {
     var selCls = groups[i] === state.favMgrFavGroup ? ' selected' : '';
-    html += '<div class="fav-modal-item' + selCls + '" onclick="favMgrSelectGroup(\'' + groups[i].replace(/'/g,"\\'") + '\')" style="cursor:pointer">';
-    html += '<div class="fav-modal-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="#e53935"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>';
-    html += '<div class="fav-modal-item-name">' + esc(groups[i]) + '</div>';
-    html += '</div>';
+    innerHtml += '<div class="fav-modal-item' + selCls + '" onclick="favMgrSelectGroup(\'' + groups[i].replace(/'/g,"\\'") + '\')" style="cursor:pointer">';
+    innerHtml += '<div class="fav-modal-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="#e53935"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>';
+    innerHtml += '<div class="fav-modal-item-name">' + esc(groups[i]) + '</div>';
+    innerHtml += '</div>';
   }
-  html += '</div></div>';
+  innerHtml += '</div></div>';
   var isFS = document.fullscreenElement || document.webkitFullscreenElement;
   if (isFS) {
     var list = document.getElementById('psp-list');
-    if (list) list.innerHTML = html;
+    if (list) list.innerHTML = innerHtml;
     var bc2 = document.getElementById('psp-breadcrumb');
     if (bc2) bc2.textContent = 'Favoriler';
   } else {
-    html = '<div class="modal-header">Sik kullanilanlar grubunu secin</div>';
-    html += '<div class="modal-body dark">' + html + '</div>';
+    var html = '<div class="modal-header">Sik kullanilanlar grubunu secin</div>';
+    html += '<div class="modal-body dark">' + innerHtml + '</div>';
     html += '<div class="modal-footer"><button class="modal-close" onclick="closeModal()">Kapat</button></div>';
     showModal(html);
   }
