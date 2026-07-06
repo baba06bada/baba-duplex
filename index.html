@@ -603,7 +603,8 @@ function hlsPlay(videoEl, url, isLive) {
   if (isLive) { videoEl.removeAttribute('controls'); }
   else { videoEl.setAttribute('controls', ''); }
 
-  var useHls = (typeof Hls !== 'undefined' && Hls.isSupported() && url.indexOf('.m3u8') > 0);
+  var isTvBrowser = /Web0S|WebOS|LG|NetCast|SmartTV|Tizen|Opera TV/i.test(navigator.userAgent || '');
+  var useHls = !isTvBrowser && typeof Hls !== 'undefined' && Hls.isSupported() && url.indexOf('.m3u8') > 0;
   if (useHls) {
     var hls = new Hls({
       maxBufferLength: isLive ? 6 : 30,
@@ -617,6 +618,7 @@ function hlsPlay(videoEl, url, isLive) {
     hls.attachMedia(videoEl);
     hls.on(Hls.Events.MANIFEST_PARSED, function() {
       videoEl.play().catch(function(){});
+      updateResDisplay(videoEl);
       startPlayerUpdate();
     });
     videoEl.addEventListener('loadedmetadata', function() { updateResDisplay(videoEl); });
@@ -629,6 +631,21 @@ function hlsPlay(videoEl, url, isLive) {
           hls._proxyTried = true;
           var pu = WORKER_URL + encodeURIComponent(url);
           setTimeout(function() { hlsPlay(videoEl, pu, isLive); }, 200);
+          return;
+        }
+        if (!hls._nativeFallbackTried) {
+          hls._nativeFallbackTried = true;
+          var nativeUrl = isProxied ? url.replace(WORKER_URL + encodeURIComponent(''), '') : url;
+          showNotification('HLS desteklenmiyor, native oynatici deneniyor...');
+          videoEl.src = nativeUrl;
+          videoEl.load();
+          videoEl.play().catch(function(){
+            if (!hls._guideShown) { hls._guideShown = true; showHttpsGuide(); }
+          });
+          videoEl.onerror = function() {
+            if (!hls._guideShown) { hls._guideShown = true; showHttpsGuide(); }
+          };
+          startPlayerUpdate();
           return;
         }
         if (!hls._guideShown) {
@@ -3728,9 +3745,17 @@ function updateResDisplay(vid) {
   var resEl = document.getElementById('p-res');
   var qEl = document.querySelector('.pq-btn .fhd');
   var w = 0, h = 0;
-  if (hlsInstance && hlsInstance.levels && hlsInstance.currentLevel >= 0) {
-    var l = hlsInstance.levels[hlsInstance.currentLevel];
-    if (l) { w = l.width || 0; h = l.height || 0; }
+  if (hlsInstance && hlsInstance.levels && hlsInstance.levels.length) {
+    if (hlsInstance.currentLevel >= 0) {
+      var l = hlsInstance.levels[hlsInstance.currentLevel];
+      if (l) { w = l.width || 0; h = l.height || 0; }
+    }
+    if (!w || !h) {
+      for (var i = 0; i < hlsInstance.levels.length; i++) {
+        var l = hlsInstance.levels[i];
+        if (l && l.width && l.height && l.width * l.height > w * h) { w = l.width; h = l.height; }
+      }
+    }
   }
   if (!w || !h) { w = vid.videoWidth; h = vid.videoHeight; }
   if (w && h) {
