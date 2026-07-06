@@ -25,7 +25,6 @@ body{background:#0a1628}
 .header-logo{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;margin-right:12px;flex-shrink:0}
 .header-logo svg{width:32px;height:32px;margin-right:4px}
 .header-logo span{font-size:18px;font-weight:bold;color:#fff}
-.header-logo .lp{color:#e91e63}
 .breadcrumb{font-size:15px;color:#5599ee;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-flex:1;flex:1;padding:0 8px}
 .header-search{width:160px;height:30px;border-radius:15px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:#fff;padding:0 12px;font-size:13px;outline:none;margin:0 8px;flex-shrink:0}
 .header-search::-webkit-input-placeholder{color:rgba(255,255,255,0.4)}
@@ -478,6 +477,7 @@ var state = {
   bgColor: '#1a3a8a',
   lastPlayed: [],
   api: null,
+  userInfo: null,
   zoomLevel: 1.0
 };
 
@@ -615,6 +615,8 @@ function hlsPlay(videoEl, url, isLive) {
       videoEl.play().catch(function(){});
       startPlayerUpdate();
     });
+    videoEl.addEventListener('loadedmetadata', function() { updateResDisplay(videoEl); });
+    hls.on(Hls.Events.LEVEL_SWITCHED, function(evt, data) { updateResDisplay(videoEl); });
     hls.on(Hls.Events.ERROR, function(evt, data) {
       if (data.fatal || (isLive && data.type === Hls.ErrorTypes.NETWORK_ERROR)) {
         if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
@@ -642,6 +644,7 @@ function hlsPlay(videoEl, url, isLive) {
     videoEl._guideShown = false;
     videoEl.src = url;
     videoEl.load();
+    videoEl.addEventListener('loadedmetadata', function() { updateResDisplay(videoEl); });
     var tryPlay = function(vid, src, showGuide) {
       vid.src = src;
       vid.load();
@@ -805,6 +808,10 @@ function loadPlaylists() {
     if (adata) state.api = JSON.parse(adata);
   } catch(e) {}
   try {
+    var udata = localStorage.getItem('dp_userInfo');
+    if (udata) state.userInfo = JSON.parse(udata);
+  } catch(e) {}
+  try {
     var zdata = localStorage.getItem('dp_zoomLevel');
     if (zdata) state.zoomLevel = parseFloat(zdata);
   } catch(e) {}
@@ -940,8 +947,10 @@ function openPlaylist(i) {
   if (!parsed.pass && p.pass) parsed.pass = p.pass;
   if (parsed.baseUrl) {
     state.api = parsed;
+    state.userInfo = null;
     try { localStorage.setItem('dp_api', JSON.stringify(parsed)); } catch(e) {}
   }
+  fetchUserInfo();
   renderScreen();
 }
 
@@ -1043,6 +1052,23 @@ function xtreamApi(action, callback) {
     if (text) {
       try { callback(JSON.parse(text)); } catch(e) { callback(null); }
     } else { callback(null); }
+  });
+}
+
+function fetchUserInfo(callback) {
+  if (!state.api || !state.api.baseUrl) { if (callback) callback(null); return; }
+  var url = state.api.baseUrl + '?username=' + state.api.user + '&password=' + state.api.pass;
+  apiRequest(url, function(text) {
+    if (text) {
+      try {
+        var data = JSON.parse(text);
+        if (data && data.user_info) {
+          state.userInfo = data.user_info;
+          try { localStorage.setItem('dp_userInfo', JSON.stringify(data.user_info)); } catch(e) {}
+        }
+        if (callback) callback(data);
+      } catch(e) { if (callback) callback(null); }
+    } else { if (callback) callback(null); }
   });
 }
 
@@ -1804,8 +1830,7 @@ function playItem(i) {
   addToLastPlayed(item);
   document.getElementById('player-screen').classList.add('active');
   document.getElementById('player-side-panel').classList.add('hidden');
-  var titleEl = document.getElementById('p-title');
-  if (titleEl) titleEl.textContent = item.title;
+  updatePlayerInfo(item);
   var vid = document.getElementById('player-video');
   reconnectAttempts = 0;
   var psEl = document.getElementById('player-screen');
@@ -1891,8 +1916,7 @@ function populatePlayerList() {
 function playerPlayItem(i) {
   state.playerCurrentIdx = i;
   var item = state.contentItems[i];
-  var titleEl = document.getElementById('p-title');
-  if (titleEl) titleEl.textContent = item.title;
+  updatePlayerInfo(item);
   var vid = document.getElementById('player-video');
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   if (state.api && state.api.baseUrl && item.stream_id) {
@@ -2151,6 +2175,7 @@ function startPlayerUpdate() {
   playerUpdateTimer = setInterval(function() {
     var vid = document.getElementById('player-video');
     if (!vid || vid.paused || vid.ended) return;
+    updateResDisplay(vid);
     forceUpdatePlayer();
   }, 500);
 }
@@ -2484,8 +2509,7 @@ function expandLivePlayer() {
   state.screen = 'player';
   document.getElementById('player-screen').classList.add('active');
   document.getElementById('player-side-panel').classList.add('hidden');
-  var titleEl = document.getElementById('p-title');
-  if (titleEl) titleEl.textContent = ch.name;
+  updatePlayerInfo(ch);
   var vid = document.getElementById('player-video');
   reconnectAttempts = 0;
   var psEl = document.getElementById('player-screen');
@@ -3181,11 +3205,18 @@ function showHttpsGuide() {
 }
 
 function showPlaylistStatus() {
-  var api = state.api || {};
-  var pl = state.playlists && state.playlists.length > 0 ? state.playlists[state.selectedPlaylist || 0] : null;
-  var liveCount = state.channels ? state.channels.length : 0;
-  var catCount = state.categories ? state.categories.length : 0;
-  var itemCount = state.contentItems ? state.contentItems.length : 0;
+  showLoading();
+  fetchUserInfo(function() {
+    hideLoading();
+    var api = state.api || {};
+    var pl = state.playlists && state.playlists.length > 0 ? state.playlists[state.selectedPlaylist || 0] : null;
+    var liveCount = state.channels ? state.channels.length : 0;
+    var catCount = state.categories ? state.categories.length : 0;
+    var itemCount = state.contentItems ? state.contentItems.length : 0;
+    var ui = state.userInfo || {};
+    var expDate = ui.exp_date ? parseInt(ui.exp_date) * 1000 : 0;
+    var daysLeft = expDate ? Math.max(0, Math.ceil((expDate - Date.now()) / 86400000)) : null;
+    var expDateStr = expDate ? new Date(expDate).toLocaleDateString('tr-TR', {day:'numeric',month:'short',year:'numeric'}) : '';
   var html = '<div class="modal-header" style="background:rgba(20,60,120,0.95)">Oynatma Listesi Durumu</div>';
   html += '<div class="modal-body" style="background:rgba(10,20,50,0.95);padding:20px;color:#ccc;font-size:13px;line-height:2">';
   if (pl) {
@@ -3197,10 +3228,11 @@ function showPlaylistStatus() {
   html += '<table style="width:100%;border-collapse:collapse">';
   html += '<tr><td style="padding:4px 8px;color:#889">Sunucu</td><td style="padding:4px 8px;color:#fff;text-align:right;word-break:break-all">' + esc(api.host || '-') + '</td></tr>';
   html += '<tr><td style="padding:4px 8px;color:#889">Kullanici</td><td style="padding:4px 8px;color:#fff;text-align:right">' + esc(api.user || '-') + '</td></tr>';
-  html += '<tr><td style="padding:4px 8px;color:#889">Durum</td><td style="padding:4px 8px;color:#4CAF50;text-align:right">Bagli</td></tr>';
+  html += '<tr><td style="padding:4px 8px;color:#889">Durum</td><td style="padding:4px 8px;color:' + (daysLeft !== null && daysLeft > 0 ? '#4CAF50' : (daysLeft === 0 ? '#e53935' : '#889')) + ';text-align:right">' + (daysLeft !== null && daysLeft > 0 ? 'Aktif' : daysLeft === 0 ? 'Sure sona erdi' : 'Bilinmiyor') + '</td></tr>';
   html += '<tr><td style="padding:4px 8px;color:#889">Canli Kanal Sayisi</td><td style="padding:4px 8px;color:#fff;text-align:right">' + (state.channelCount || liveCount || '?') + '</td></tr>';
   html += '<tr><td style="padding:4px 8px;color:#889">Kategori Sayisi</td><td style="padding:4px 8px;color:#fff;text-align:right">' + catCount + '</td></tr>';
   html += '<tr><td style="padding:4px 8px;color:#889">Film/Dizi Sayisi</td><td style="padding:4px 8px;color:#fff;text-align:right">' + itemCount + '</td></tr>';
+  html += '<tr><td style="padding:4px 8px;color:#889">Kalan Gun</td><td style="padding:4px 8px;color:' + (daysLeft !== null && daysLeft <= 3 ? '#e53935' : '#fff') + ';text-align:right">' + (daysLeft !== null && daysLeft > 0 ? daysLeft + ' gun' : daysLeft === 0 ? 'Sona erdi' : 'Bilinmiyor') + (expDateStr ? ' (' + expDateStr + ')' : '') + '</td></tr>';
   html += '<tr><td style="padding:4px 8px;color:#889">Proxy</td><td style="padding:4px 8px;color:#889;text-align:right;font-size:11px;word-break:break-all">' + esc(userProxyUrl || '-') + '</td></tr>';
   html += '</table>';
   html += '<div style="margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;color:#667">';
@@ -3209,6 +3241,7 @@ function showPlaylistStatus() {
   html += '</div>';
   html += '<div class="modal-footer" style="background:rgba(10,20,50,0.95);padding:12px"><button class="modal-close" onclick="closeModal()">Kapat</button></div>';
   showModal(html);
+    });
 }
 
 function openSetting(type) {
@@ -3674,6 +3707,40 @@ function resolveIcon(url) {
   return base + (url.charAt(0) === '/' ? url.substring(1) : url);
 }
 
+function updatePlayerInfo(item) {
+  var titleEl = document.getElementById('p-title');
+  if (titleEl) titleEl.textContent = item.title || item.name || '';
+  var thumbEl = document.getElementById('p-thumb');
+  if (thumbEl) {
+    var icon = item.stream_icon || getItemIcon(item) || '';
+    if (icon) { thumbEl.src = resolveIcon(icon); thumbEl.style.display = ''; }
+    else { thumbEl.src = ''; thumbEl.style.display = 'none'; }
+  }
+  updateResDisplay(document.getElementById('player-video'));
+}
+
+function updateResDisplay(vid) {
+  if (!vid) vid = document.getElementById('player-video');
+  if (!vid) return;
+  var resEl = document.getElementById('p-res');
+  var qEl = document.querySelector('.pq-btn .fhd');
+  var w = vid.videoWidth, h = vid.videoHeight;
+  if (!w && hlsInstance && hlsInstance.levels && hlsInstance.currentLevel >= 0) {
+    var l = hlsInstance.levels[hlsInstance.currentLevel];
+    if (l && l.width && l.height) { w = l.width; h = l.height; }
+  }
+  if (w && h) {
+    if (resEl) resEl.textContent = w + 'x' + h;
+    if (qEl) {
+      if (h >= 2160) qEl.textContent = '4K';
+      else if (h >= 1080) qEl.textContent = 'FHD';
+      else if (h >= 720) qEl.textContent = 'HD';
+      else if (h >= 480) qEl.textContent = 'SD';
+      else qEl.textContent = h + 'p';
+    }
+  }
+}
+
 function esc(s) {
   if (!s) return '';
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -3720,6 +3787,7 @@ loadPlaylists();
 state.screen = 'playlists';
 applyAutoScale();
 renderScreen();
+if (state.api && state.api.baseUrl) fetchUserInfo();
 
 if (location.protocol === 'https:') {
   var hi = document.getElementById('footer-https-indicator');
