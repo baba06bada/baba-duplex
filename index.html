@@ -591,6 +591,10 @@ function stopPlayerEngine() {
 
 function hlsPlay(videoEl, url, isLive) {
   stopPlayerEngine();
+  var resEl = document.getElementById('p-res');
+  if (resEl) resEl.textContent = '...';
+  var qEl = document.querySelector('.pq-btn .fhd');
+  if (qEl) qEl.textContent = '...';
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   videoEl.pause();
   videoEl.onerror = null;
@@ -3716,7 +3720,6 @@ function updatePlayerInfo(item) {
     if (icon) { thumbEl.src = resolveIcon(icon); thumbEl.style.display = ''; }
     else { thumbEl.src = ''; thumbEl.style.display = 'none'; }
   }
-  updateResDisplay(document.getElementById('player-video'));
 }
 
 function updateResDisplay(vid) {
@@ -3724,11 +3727,12 @@ function updateResDisplay(vid) {
   if (!vid) return;
   var resEl = document.getElementById('p-res');
   var qEl = document.querySelector('.pq-btn .fhd');
-  var w = vid.videoWidth, h = vid.videoHeight;
-  if (!w && hlsInstance && hlsInstance.levels && hlsInstance.currentLevel >= 0) {
+  var w = 0, h = 0;
+  if (hlsInstance && hlsInstance.levels && hlsInstance.currentLevel >= 0) {
     var l = hlsInstance.levels[hlsInstance.currentLevel];
-    if (l && l.width && l.height) { w = l.width; h = l.height; }
+    if (l) { w = l.width || 0; h = l.height || 0; }
   }
+  if (!w || !h) { w = vid.videoWidth; h = vid.videoHeight; }
   if (w && h) {
     if (resEl) resEl.textContent = w + 'x' + h;
     if (qEl) {
