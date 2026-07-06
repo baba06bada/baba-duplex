@@ -592,6 +592,7 @@ function hlsPlay(videoEl, url, isLive) {
   stopPlayerEngine();
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   videoEl.pause();
+  videoEl.onerror = null;
   reconnectAttempts = 0;
   videoEl._stallCount = 0;
   if (isLive) { videoEl.removeAttribute('controls'); }
@@ -625,9 +626,29 @@ function hlsPlay(videoEl, url, isLive) {
     });
     hlsInstance = hls;
   } else {
-    videoEl.src = url;
-    videoEl.load();
-    videoEl.play().catch(function(){});
+    var loadAttempt = 0;
+    var maxAttempts = userProxyUrl ? 2 : 1;
+    function doLoad() {
+      loadAttempt++;
+      var useProxy = (userProxyUrl && loadAttempt === 1);
+      var playUrl = useProxy ? proxifyUrl(url) : url;
+      console.log('Movie URL ' + (useProxy ? 'via proxy' : 'direct') + ':', playUrl);
+      videoEl.src = playUrl;
+      videoEl.load();
+      videoEl.play().catch(function(err){
+        if (err) showNotification('Video hatasi: ' + (err.message || err));
+        if (useProxy && loadAttempt < maxAttempts) { setTimeout(doLoad, 500); }
+      });
+      videoEl.onerror = function() {
+        var msg = videoEl.error ? (videoEl.error.code + ': ' + videoEl.error.message) : 'bilinmeyen hata';
+        showNotification('Video yukleme hatasi (' + url.substring(0,50) + '...): ' + msg);
+        if (useProxy && loadAttempt < maxAttempts) {
+          videoEl.onerror = null;
+          setTimeout(doLoad, 500);
+        }
+      };
+    }
+    doLoad();
     startPlayerUpdate();
   }
 
@@ -3546,7 +3567,7 @@ function getItemIcon(item) {
 
 function resolveIcon(url) {
   if (!url) return '';
-  if (url.indexOf('http') === 0) return proxifyUrl(url);
+  if (url.indexOf('http') === 0) return url;
   if (!state.api || !state.api.baseUrl) return '';
   var base = state.api.baseUrl.replace(/player_api\.php.*$/, '');
   return base + (url.charAt(0) === '/' ? url.substring(1) : url);
