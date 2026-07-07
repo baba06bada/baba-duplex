@@ -1463,12 +1463,14 @@ function saveEditPlaylist(i) {
 function openLastPlayed() {
   state.history.push({screen:'playlists'});
   state.screen = 'replay';
+  state.currentPage = 1;
+  state.totalPages = 1;
   var bc = ['Son oynatilanlar'];
   setBreadcrumb(bc);
   setFooterContent();
   var el = document.getElementById('content');
   var items = state.lastPlayed || [];
-  state.contentItems = items;
+  state.contentItems = items.slice();
   if (items.length === 0) {
     el.innerHTML = '<div style="text-align:center;color:#888;padding:40px;font-size:14px">Henuz oynatilmis icerik yok</div>';
     return;
@@ -2231,8 +2233,30 @@ function playFavItem(idx) {
   var fi = allItems[idx];
   if (!fi) return;
   closePlayerSettings();
-  state.contentItems = allItems;
-  playItem(idx);
+  var vid = document.getElementById('player-video');
+  var api = state.api;
+  document.getElementById('player-screen').classList.add('active');
+  document.getElementById('player-side-panel').classList.add('hidden');
+  state.history.push({screen: state.screen});
+  state.screen = 'player';
+  addToLastPlayed(fi);
+  updatePlayerInfo(fi);
+  updatePlayerHeartBtn();
+  triggerOsd();
+  reconnectAttempts = 0;
+  var psEl = document.getElementById('player-screen');
+  if (psEl.requestFullscreen) psEl.requestFullscreen();
+  else if (psEl.webkitRequestFullscreen) psEl.webkitRequestFullscreen();
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+  if (api && api.baseUrl && fi.stream_id) {
+    var url = getStreamUrl(fi.type || 'movie', fi.stream_id, fi.container_extension);
+    var isLive = (fi.type === 'live');
+    setPlayerMode(isLive);
+    hlsPlay(vid, url, isLive);
+  } else {
+    vid.src = '';
+    vid.load();
+  }
 }
 
 function playerCast() {
