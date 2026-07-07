@@ -417,6 +417,11 @@ body{background:#0a1628}
             <div class="pa-btn" tabindex="0" onclick="closePlayer()" title="Geri"><svg viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2.5"><path d="M9 14l-4-4 4-4"/><path d="M5 10h11a4 4 0 010 8h-1"/></svg></div>
           </div>
         </div>
+        <div class="player-info">
+          <div class="player-title" id="p-title"></div>
+          <div class="player-res" id="p-res"></div>
+          <div class="player-time" id="p-clock"></div>
+        </div>
       </div>
       <div id="player-settings-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:200;display:none;-webkit-box-align:center;-webkit-align-items:center;align-items:center;-webkit-box-pack:center;-webkit-justify-content:center;justify-content:center;background:rgba(0,0,0,0.5)">
         <div id="player-settings-panel" style="background:rgba(20,40,80,0.95);border-radius:10px;border:1px solid rgba(100,160,255,0.3);width:500px;max-width:90%;max-height:85vh;overflow:hidden">
@@ -544,6 +549,7 @@ document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
 function handleFullscreenChange() {
   if (!document.fullscreenElement && !document.webkitFullscreenElement) {
     applyAutoScale();
+    triggerOsd();
   }
 }
 
@@ -661,6 +667,14 @@ function hlsPlay(videoEl, url, isLive) {
           var pu = WORKER_URL + encodeURIComponent(url);
           setTimeout(function() { hlsPlay(videoEl, pu, isLive); }, 200);
           return;
+        }
+        if (!hls._vodFallbackTried && !isLive && videoEl._vodDirectUrl) {
+          hls._vodFallbackTried = true;
+          showNotification('Altyazi icin dogrudan dosya deneniyor...');
+          if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+          videoEl.src = videoEl._vodDirectUrl; videoEl.load();
+          videoEl.play().catch(function(){});
+          startPlayerUpdate(); return;
         }
         if (!hls._nativeFallbackTried) {
           hls._nativeFallbackTried = true;
@@ -1393,6 +1407,12 @@ function getStreamUrl(type, streamId, ext) {
   return base + type + '/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.' + (ext || 'mp4');
 }
 
+function getStreamUrlHls(type, streamId) {
+  if (!state.api || !state.api.baseUrl) return '';
+  var base = state.api.baseUrl.replace('player_api.php', '');
+  return base + type + '/' + state.api.user + '/' + state.api.pass + '/' + streamId + '.m3u8';
+}
+
 function deletePlaylist(i) {
   var p = state.playlists[i];
   showConfirm('"' + (p.name || p.url) + '" silmek istediginize emin misiniz?', function() {
@@ -1954,6 +1974,7 @@ function playItem(i) {
   document.getElementById('player-screen').classList.add('active');
   document.getElementById('player-side-panel').classList.add('hidden');
   updatePlayerInfo(item);
+  triggerOsd();
   var vid = document.getElementById('player-video');
   reconnectAttempts = 0;
   var psEl = document.getElementById('player-screen');
@@ -1961,8 +1982,16 @@ function playItem(i) {
   else if (psEl.webkitRequestFullscreen) psEl.webkitRequestFullscreen();
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   if (state.api && state.api.baseUrl && item.stream_id) {
-    var url = getStreamUrl(item.type || 'movie', item.stream_id, item.container_extension);
     var isLive = (item.type === 'live');
+    var url;
+    if (isLive) {
+      url = getStreamUrl('live', item.stream_id);
+    } else {
+      var directUrl = getStreamUrl(item.type || 'movie', item.stream_id, item.container_extension);
+      var hlsUrl = getStreamUrlHls(item.type || 'movie', item.stream_id);
+      vid._vodDirectUrl = directUrl;
+      url = hlsUrl;
+    }
     setPlayerMode(isLive);
     hlsPlay(vid, url, isLive);
   } else {
@@ -2044,8 +2073,16 @@ function playerPlayItem(i) {
   var vid = document.getElementById('player-video');
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   if (state.api && state.api.baseUrl && item.stream_id) {
-    var url = getStreamUrl(item.type || 'movie', item.stream_id, item.container_extension);
     var isLive = (item.type === 'live');
+    var url;
+    if (isLive) {
+      url = getStreamUrl('live', item.stream_id);
+    } else {
+      var directUrl = getStreamUrl(item.type || 'movie', item.stream_id, item.container_extension);
+      var hlsUrl = getStreamUrlHls(item.type || 'movie', item.stream_id);
+      vid._vodDirectUrl = directUrl;
+      url = hlsUrl;
+    }
     setPlayerMode(isLive);
     reconnectAttempts = 0;
     hlsPlay(vid, url, isLive);
@@ -2128,16 +2165,10 @@ function playerToggleFav() {
   var panel = document.getElementById('player-settings-panel');
   var overlay = document.getElementById('player-settings-overlay');
   if (!panel || !overlay) return;
-  var poster = item.stream_icon || '';
   var h = '<div style="padding:14px 18px;background:rgba(100,180,255,0.15);border-bottom:1px solid rgba(100,160,200,0.2);text-align:center">';
   h += '<span style="color:#fff;font-size:16px;font-weight:bold">Favori: ' + (item.title || '') + '</span></div>';
-  h += '<div style="display:flex;padding:16px;gap:16px;max-height:70vh">';
-  if (poster) {
-    h += '<div style="width:140px;flex-shrink:0">';
-    h += '<img src="' + poster + '" style="width:140px;height:200px;object-fit:cover;border-radius:6px;border:2px solid rgba(255,255,255,0.2)" onerror="this.style.display=\'none\'"/>';
-    h += '</div>';
-  }
-  h += '<div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-content:start">';
+  h += '<div style="padding:16px;overflow-y:auto;max-height:60vh">';
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">';
   for (var n = 1; n <= 12; n++) {
     var grpName = 'Favorites ' + n;
     var grp = state.favorites[grpName] || [];
@@ -2147,8 +2178,8 @@ function playerToggleFav() {
     }
     var bg = hasItem ? 'rgba(229,57,53,0.4)' : 'rgba(255,255,255,0.08)';
     var border = hasItem ? '2px solid #e53935' : '2px solid rgba(255,255,255,0.15)';
-    var heart = hasItem ? '<span style="color:#e53935;font-size:14px;margin-right:4px">&#9829;</span>' : '';
-    h += '<div onclick="toggleFavSlot(' + n + ')" style="padding:14px 10px;border-radius:6px;background:' + bg + ';border:' + border + ';color:#fff;font-size:13px;cursor:pointer;text-align:center;font-weight:bold">' + heart + 'Favorites ' + n + '</div>';
+    var heart = hasItem ? '<span style="color:#e53935;font-size:14px;display:block;margin-bottom:2px">&#9829;</span>' : '';
+    h += '<div onclick="toggleFavSlot(' + n + ')" style="padding:16px 8px;border-radius:6px;background:' + bg + ';border:' + border + ';color:#fff;font-size:13px;cursor:pointer;text-align:center;font-weight:bold">' + heart + 'Favorites ' + n + '</div>';
   }
   h += '</div></div>';
   h += '<div style="padding:10px 18px 16px;text-align:center"><button onclick="closePlayerSettings()" style="width:180px;height:40px;font-size:15px;border:none;border-radius:6px;background:#4a90d9;color:#fff;cursor:pointer;font-weight:bold">Kapat</button></div>';
@@ -3157,6 +3188,7 @@ function expandLivePlayer() {
   document.getElementById('player-screen').classList.add('active');
   document.getElementById('player-side-panel').classList.add('hidden');
   updatePlayerInfo(ch);
+  triggerOsd();
   var vid = document.getElementById('player-video');
   reconnectAttempts = 0;
   var psEl = document.getElementById('player-screen');
