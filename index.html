@@ -328,46 +328,89 @@ body{background:#0a1628}
 
 /* Phone responsive */
 @media screen and (max-width:768px){
-.main-menu{padding:12px 10px;flex-wrap:wrap;-webkit-flex-wrap:wrap}
-.mm-tile{width:calc(50% - 12px);height:180px;margin:6px}
-.mm-tile-icon{width:64px;height:64px;margin-bottom:10px}
-.mm-tile-label{font-size:15px}
-.cat-grid{-webkit-flex-wrap:wrap;flex-wrap:wrap}
-.cat-item{width:calc(50% - 10px);height:56px}
-.content-item{width:calc(33.333% - 8px)}
-.pl-layout{-webkit-flex-direction:column;flex-direction:column}
-.pl-left{width:100%;padding:4px}
-.pl-right{width:100%;padding:4px}
-.pl-item{width:calc(100% - 8px);height:52px}
-.pl-recent-item{width:calc(33.333% - 6px)}
-.header-search{width:110px}
-.header-logo span{font-size:15px}
-.header-clock{font-size:12px}
+*{-webkit-tap-highlight-color:transparent}
+html,body{overflow:initial}
+#app{height:auto;min-height:100%;-webkit-flex-direction:column;flex-direction:column}
+.header{height:auto;min-height:44px;padding:4px 8px;flex-wrap:wrap;gap:4px}
+.header-logo{display:none}
+.header-search{width:100%;height:36px;font-size:16px;margin:0;order:-1;flex:1;border-radius:8px}
+.header-btn{width:36px;height:36px;margin:0 2px}
+.header-clock{display:none}
+.breadcrumb{font-size:13px;padding:0 4px}
+.footer{height:auto;min-height:40px;padding:4px 6px;padding-bottom:calc(4px + env(safe-area-inset-bottom));overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;white-space:nowrap;flex-wrap:nowrap;gap:4px}
 .footer-hint{display:none}
+.footer-sep{display:none}
+.footer-btn{font-size:11px;padding:5px 8px;margin:0;white-space:nowrap;flex-shrink:0}
+.footer-btn svg{display:none}
+.content{min-height:0;-webkit-flex:1;flex:1}
+.screen{padding:2px 4px}
+.main-menu{padding:8px;flex-wrap:wrap;-webkit-flex-wrap:wrap;-webkit-box-pack:center;-webkit-justify-content:center;justify-content:center;min-height:auto}
+.mm-tile{width:calc(50% - 10px);height:160px;margin:5px}
+.mm-tile-icon{width:56px;height:56px;margin-bottom:8px}
+.mm-tile-label{font-size:14px}
+.cat-grid{-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.cat-item{width:calc(50% - 10px);height:50px;font-size:12px}
+.cat-icon{width:30px;height:30px;margin-right:8px}
+.cat-count{width:24px;height:24px;font-size:10px}
+.content-grid{-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.content-item{width:calc(33.333% - 6px);margin:3px}
+.content-thumb{padding-top:130%}
+.content-title{font-size:10px;padding:4px 2px 3px}
+.pl-layout{-webkit-flex-direction:column;flex-direction:column}
+.pl-left{width:100%;padding:2px}
+.pl-right{width:100%;padding:2px}
+.pl-item{width:100%;height:48px}
+.pl-recent-item{width:calc(33.333% - 6px)}
+.live-layout{-webkit-flex-direction:column;flex-direction:column}
+.live-channels{width:100%;padding-right:0}
+.live-ch-item{height:60px}
+.live-preview{width:100%;padding-left:0}
 .player-side-panel{width:100%;position:absolute;top:0;left:0;z-index:300;border-left:none}
 .player-side-panel.hidden{display:none}
 .player-layout{-webkit-flex-direction:column;flex-direction:column}
-.player-video-area{height:50%}
-.player-range-wrap{padding:6px 4px 4px}
-.player-controls{padding:0}
-.pm-btn{width:36px;height:36px;margin:0 4px}
-.pm-play{width:48px;height:48px}
-.pbb-btn{width:40px;height:40px}
-.pbb-play{width:52px;height:52px}
-.player-title{font-size:13px;padding-left:0}
-.pl-opt-item{width:calc(50% - 8px)}
-.modal{width:92%;max-width:none}
-.content-grid{padding:4px 1px}
-.content-item{width:calc(33.333% - 6px)}
-.live-ch-item{width:calc(50% - 8px);height:80px}
-.screen{padding:2px 6px}
+.player-video-area{height:50%;-webkit-flex:none;flex:none}
+.player-overlay{padding:4px 8px 2px}
+.player-top{-webkit-flex-wrap:wrap;flex-wrap:wrap;gap:4px}
+.player-thumb{display:none}
+.player-quality{-webkit-flex-wrap:wrap;flex-wrap:wrap;gap:2px;margin:0}
+.pq-btn{width:28px;height:24px;font-size:8px;margin:0}
+.player-actions{-webkit-flex-wrap:wrap;flex-wrap:wrap;gap:2px}
+.pa-btn{width:30px;height:30px;margin:0}
+.pa-btn svg{width:16px;height:16px}
+.player-info{margin:2px 0}
+.player-title{font-size:12px;padding-left:0}
+.player-res,.player-time{font-size:11px}
+.player-range-wrap{padding:4px 2px 2px}
+.player-controls{padding:0;gap:2px}
+.pm-btn{width:32px;height:32px;margin:0}
+.pm-play{width:40px;height:40px}
+.player-bottom-bar{gap:10px;padding:6px 0}
+.pbb-btn{width:36px;height:36px}
+.pbb-play{width:44px;height:44px}
+.pl-opt-item{width:calc(50% - 8px);padding:12px 6px}
+.modal{width:95%;max-width:none;max-height:90vh}
+.modal-body{max-height:70vh}
+.settings-grid{-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.settings-tile{width:calc(50% - 8px);padding:10px 6px}
+.settings-tile-icon{width:36px;height:36px}
+.fav-grid{-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.fav-item{width:calc(50% - 10px);height:60px}
+.fav-modal{width:96%;max-height:90vh}
+.fav-modal-grid{-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.fav-modal-item{width:calc(50% - 8px);padding:8px 6px}
+.fav-mgr{-webkit-flex-direction:column;flex-direction:column}
+.fav-mgr-transfer{width:100%;flex-direction:row;padding:6px}
+.fav-mgr-arrow{width:100%;height:36px}
+.bg-grid{-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.bg-thumb{width:calc(25% - 8px);height:50px}
 }
 @media screen and (max-width:400px){
-.mm-tile{width:calc(100% - 12px);height:140px}
-.mm-tile-icon{width:48px;height:48px}
-.mm-tile-label{font-size:14px}
+.mm-tile{width:calc(50% - 8px);height:130px}
+.mm-tile-icon{width:44px;height:44px}
+.mm-tile-label{font-size:13px}
 .content-item{width:calc(50% - 6px)}
-.cat-item{width:calc(100% - 10px)}
+.cat-item{width:calc(100% - 8px)}
+.footer-btn{font-size:10px;padding:4px 6px}
 }
 </style>
 </head>
@@ -746,6 +789,26 @@ function hlsPlay(videoEl, url, isLive) {
   } else {
     var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
     var needsP = needsProxy(url);
+    var isM3u8 = url.indexOf('.m3u8') > 0;
+    if (isIOS && isM3u8 && needsP && userProxyUrl) {
+      videoEl._fallbackTried = false;
+      videoEl._guideShown = false;
+      showNotification('M3u8 yukleniyor...');
+      proxyM3u8ForIOS(url, userProxyUrl, function(blobUrl) {
+        if (blobUrl) {
+          videoEl.src = blobUrl;
+          videoEl.load();
+          videoEl.play().catch(function(){});
+          startPlayerUpdate();
+        } else {
+          var directUrl = userProxyUrl + encodeURIComponent(url);
+          videoEl.src = directUrl;
+          videoEl.load();
+          videoEl.play().catch(function(){});
+          startPlayerUpdate();
+        }
+      });
+    } else {
     var directUrl = (isIOS && needsP && userProxyUrl) ? userProxyUrl + encodeURIComponent(url) : url;
     videoEl._fallbackTried = false;
     videoEl._guideShown = false;
@@ -772,6 +835,7 @@ function hlsPlay(videoEl, url, isLive) {
       }
     };
     startPlayerUpdate();
+    }
   }
 
   videoEl.removeEventListener('error', hlsOnError);
@@ -1168,6 +1232,42 @@ var WORKER_URL = 'https://small-poetry-287c.f3baba06.workers.dev/?url=';
 var userProxyUrl = localStorage.getItem('dp_proxyUrl') || WORKER_URL;
 function needsProxy(url) {
   return url && url.indexOf('http') === 0 && location.protocol === 'https:' && url.indexOf('https:') !== 0;
+}
+
+function proxyM3u8ForIOS(m3u8Url, proxyUrl, callback) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', proxyUrl + encodeURIComponent(m3u8Url), true);
+  xhr.timeout = 15000;
+  xhr.onload = function() {
+    if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
+      var content = xhr.responseText;
+      var baseUrl = m3u8Url.replace(/\/[^\/]*$/, '/');
+      var lines = content.split('\n');
+      var rewritten = [];
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (line === '' || line.charAt(0) === '#') {
+          rewritten.push(line);
+          continue;
+        }
+        if (line.indexOf('http://') === 0 || line.indexOf('https://') === 0) {
+          rewritten.push(proxyUrl + encodeURIComponent(line));
+        } else if (line.indexOf('data:') === 0) {
+          rewritten.push(line);
+        } else {
+          var absUrl = baseUrl + line;
+          rewritten.push(proxyUrl + encodeURIComponent(absUrl));
+        }
+      }
+      var blob = new Blob([rewritten.join('\n')], {type: 'application/x-mpegurl'});
+      callback(URL.createObjectURL(blob));
+    } else {
+      callback(null);
+    }
+  };
+  xhr.onerror = function() { callback(null); };
+  xhr.ontimeout = function() { callback(null); };
+  xhr.send();
 }
 
 function apiRequest(url, callback) {
