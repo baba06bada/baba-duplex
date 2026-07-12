@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>babaplayer</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8"></script>
 <style>
@@ -320,6 +320,55 @@ body{background:#0a1628}
 /* Utility */
 .hidden{display:none!important}
 .flex-center{-webkit-box-align:center;-webkit-align-items:center;align-items:center;-webkit-box-pack:center;-webkit-justify-content:center;justify-content:center}
+
+/* iOS Safe Area */
+.header{padding-top:env(safe-area-inset-top)}
+.footer{padding-bottom:env(safe-area-inset-bottom)}
+#player-screen .player-bottom-bar{padding-bottom:env(safe-area-inset-bottom)}
+
+/* Phone responsive */
+@media screen and (max-width:768px){
+.main-menu{padding:12px 10px;flex-wrap:wrap;-webkit-flex-wrap:wrap}
+.mm-tile{width:calc(50% - 12px);height:180px;margin:6px}
+.mm-tile-icon{width:64px;height:64px;margin-bottom:10px}
+.mm-tile-label{font-size:15px}
+.cat-grid{-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.cat-item{width:calc(50% - 10px);height:56px}
+.content-item{width:calc(33.333% - 8px)}
+.pl-layout{-webkit-flex-direction:column;flex-direction:column}
+.pl-left{width:100%;padding:4px}
+.pl-right{width:100%;padding:4px}
+.pl-item{width:calc(100% - 8px);height:52px}
+.pl-recent-item{width:calc(33.333% - 6px)}
+.header-search{width:110px}
+.header-logo span{font-size:15px}
+.header-clock{font-size:12px}
+.footer-hint{display:none}
+.player-side-panel{width:100%;position:absolute;top:0;left:0;z-index:300;border-left:none}
+.player-side-panel.hidden{display:none}
+.player-layout{-webkit-flex-direction:column;flex-direction:column}
+.player-video-area{height:50%}
+.player-range-wrap{padding:6px 4px 4px}
+.player-controls{padding:0}
+.pm-btn{width:36px;height:36px;margin:0 4px}
+.pm-play{width:48px;height:48px}
+.pbb-btn{width:40px;height:40px}
+.pbb-play{width:52px;height:52px}
+.player-title{font-size:13px;padding-left:0}
+.pl-opt-item{width:calc(50% - 8px)}
+.modal{width:92%;max-width:none}
+.content-grid{padding:4px 1px}
+.content-item{width:calc(33.333% - 6px)}
+.live-ch-item{width:calc(50% - 8px);height:80px}
+.screen{padding:2px 6px}
+}
+@media screen and (max-width:400px){
+.mm-tile{width:calc(100% - 12px);height:140px}
+.mm-tile-icon{width:48px;height:48px}
+.mm-tile-label{font-size:14px}
+.content-item{width:calc(50% - 6px)}
+.cat-item{width:calc(100% - 10px)}
+}
 </style>
 </head>
 <body>
