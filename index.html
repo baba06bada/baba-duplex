@@ -326,7 +326,6 @@ body{background:#0a1628}
 .footer{padding-bottom:env(safe-area-inset-bottom)}
 #player-screen .player-bottom-bar{padding-bottom:env(safe-area-inset-bottom)}
 
-/* Phone responsive */
 @media screen and (max-width:768px){
 *{-webkit-tap-highlight-color:transparent}
 html,body{overflow:initial}
@@ -360,7 +359,6 @@ html,body{overflow:initial}
 .pl-left{width:100%;padding:2px}
 .pl-right{width:100%;padding:2px}
 .pl-item{width:100%;height:48px}
-.pl-recent-item{width:calc(33.333% - 6px)}
 .live-layout{-webkit-flex-direction:column;flex-direction:column}
 .live-channels{width:100%;padding-right:0}
 .live-ch-item{height:60px}
@@ -392,7 +390,6 @@ html,body{overflow:initial}
 .modal-body{max-height:70vh}
 .settings-grid{-webkit-flex-wrap:wrap;flex-wrap:wrap}
 .settings-tile{width:calc(50% - 8px);padding:10px 6px}
-.settings-tile-icon{width:36px;height:36px}
 .fav-grid{-webkit-flex-wrap:wrap;flex-wrap:wrap}
 .fav-item{width:calc(50% - 10px);height:60px}
 .fav-modal{width:96%;max-height:90vh}
@@ -466,7 +463,6 @@ html,body{overflow:initial}
       Ayarlar
     </div>
     </div>
-
   </div>
 
 <!-- Player Screen -->
@@ -768,7 +764,6 @@ function hlsPlay(videoEl, url, isLive) {
           showNotification('HLS desteklenmiyor, native oynatici deneniyor...');
           videoEl.src = nativeUrl; videoEl.load();
           videoEl.play().catch(function(){});
-          videoEl.onerror = function() {};
           startPlayerUpdate(); return;
         }
         if (!isProxied && isLive && !reconnecting && reconnectAttempts < RECONNECT_MAX) {
@@ -787,12 +782,8 @@ function hlsPlay(videoEl, url, isLive) {
     });
     hlsInstance = hls;
   } else {
-    var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-    var needsP = needsProxy(url);
-    var directUrl = (needsP && userProxyUrl) ? userProxyUrl + encodeURIComponent(url) : url;
     videoEl._fallbackTried = false;
-    videoEl._guideShown = false;
-    videoEl.src = directUrl;
+    videoEl.src = url;
     videoEl.load();
     videoEl.addEventListener('loadedmetadata', function() { updateResDisplay(videoEl); detectAvailableTracks(videoEl, null); });
     var tryPlay = function(vid, src) {
@@ -803,15 +794,13 @@ function hlsPlay(videoEl, url, isLive) {
     videoEl.play().catch(function(err){
       if (!videoEl._fallbackTried) {
         videoEl._fallbackTried = true;
-        var fbUrl = (directUrl !== url) ? url : WORKER_URL + encodeURIComponent(url);
-        tryPlay(videoEl, fbUrl);
+        tryPlay(videoEl, WORKER_URL + encodeURIComponent(url));
       }
     });
     videoEl.onerror = function() {
       if (!videoEl._fallbackTried) {
         videoEl._fallbackTried = true;
-        var fbUrl2 = (directUrl !== url) ? url : WORKER_URL + encodeURIComponent(url);
-        tryPlay(videoEl, fbUrl2);
+        tryPlay(videoEl, WORKER_URL + encodeURIComponent(url));
       }
     };
     startPlayerUpdate();
@@ -963,8 +952,8 @@ document.addEventListener('keydown', function(e) {
     if (kc === 39) { tvNavigate('ArrowRight'); e.preventDefault(); }
     if (kc === 40) { tvNavigate('ArrowDown'); e.preventDefault(); }
     if (kc === 8 || kc === 27) {
-      var el = document.activeElement;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
+      var tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       var mo = document.getElementById('modal-overlay');
       if (mo && mo.classList.contains('active')) { closeModal(); e.preventDefault(); }
       else if (state.screen !== 'playlists') { goBack(); e.preventDefault(); }
@@ -2055,7 +2044,8 @@ function playItem(i) {
   var vid = document.getElementById('player-video');
   reconnectAttempts = 0;
   var psEl = document.getElementById('player-screen');
-  try { psEl.requestFullscreen && psEl.requestFullscreen(); } catch(e) {}
+  if (psEl.requestFullscreen) psEl.requestFullscreen();
+  else if (psEl.webkitRequestFullscreen) psEl.webkitRequestFullscreen();
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   if (state.api && state.api.baseUrl && item.stream_id) {
     var url = getStreamUrl(item.type || 'movie', item.stream_id, item.container_extension);
@@ -2328,7 +2318,8 @@ function playFavItem(idx) {
   triggerOsd();
   reconnectAttempts = 0;
   var psEl = document.getElementById('player-screen');
-  try { psEl.requestFullscreen && psEl.requestFullscreen(); } catch(e) {}
+  if (psEl.requestFullscreen) psEl.requestFullscreen();
+  else if (psEl.webkitRequestFullscreen) psEl.webkitRequestFullscreen();
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   if (api && api.baseUrl && fi.stream_id) {
     var url = getStreamUrl(fi.type || 'movie', fi.stream_id, fi.container_extension);
@@ -2639,7 +2630,8 @@ function playerFullscreen() {
     else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
     document.body.style.transform = 'scale(' + (state.zoomLevel || 1) + ')';
   } else {
-    try { el.requestFullscreen && el.requestFullscreen(); } catch(e) {}
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
     document.body.style.transform = 'none';
   }
 }
@@ -3325,7 +3317,8 @@ function expandLivePlayer() {
   var vid = document.getElementById('player-video');
   reconnectAttempts = 0;
   var psEl = document.getElementById('player-screen');
-  try { psEl.requestFullscreen && psEl.requestFullscreen(); } catch(e) {}
+  if (psEl.requestFullscreen) psEl.requestFullscreen();
+  else if (psEl.webkitRequestFullscreen) psEl.webkitRequestFullscreen();
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
   if (state.api && state.api.baseUrl && ch.stream_id) {
     var url = getStreamUrl('live', ch.stream_id);
@@ -3412,8 +3405,6 @@ function renderFavorites(el) {
 function setFooterFavManager() {
   var f = document.getElementById('footer-content');
   f.innerHTML = '<div class="footer-hint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Kaydirmak icin yukari / asagi kaydirin</div>';
-  var lock = document.querySelector('.footer-lock');
-  if (lock) lock.style.display = 'none';
 }
 
 function setFooterFav() {
@@ -4174,7 +4165,7 @@ function showGeneralSettings() {
   html += '<div class="settings-row" onclick="showSortType()" style="cursor:pointer"><div class="settings-label">Oynatma Listeleri Siralama Turu</div><div class="settings-value" id="sort-val">' + (state.sortType || 'Varsayilan') + '</div></div>';
   html += '<div class="settings-row" onclick="showZoomSelect()" style="cursor:pointer"><div class="settings-label">Yakinlastirma</div><div class="settings-value" id="zoom-val">%' + Math.round((state.zoomLevel || 1) * 100) + '</div></div>';
    html += '<div class="settings-row" onclick="showProxySetting()" style="cursor:pointer"><div class="settings-label">Vekil Sunucu URL</div><div class="settings-value" id="proxy-val" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (userProxyUrl || 'Otomatik') + '</div></div>';
-  html += '<div class="settings-row"><div class="settings-label">Uygulama klavyesini kullan</div><div class="settings-toggle" onclick="toggleSwitch(this)"><span class="toggle-label">OFF</span></div></div>';
+   html += '<div class="settings-row"><div class="settings-label">Uygulama klavyesini kullan</div><div class="settings-toggle" onclick="toggleSwitch(this)"><span class="toggle-label">OFF</span></div></div>';
   html += '</div></div>';
   html += '<div class="modal-footer" style="background:rgba(10,20,50,0.85);padding:12px 16px"><button class="modal-close" style="width:180px;height:42px;font-size:16px;padding:0" onclick="closeModal()">Kapat</button></div>';
   showModal(html);
@@ -4578,12 +4569,13 @@ state.screen = 'playlists';
 applyAutoScale();
 renderScreen();
 if (state.api && state.api.baseUrl) fetchUserInfo();
+try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function(){}); } catch(e){}
+var wakeLock = null;
+async function requestWakeLock() { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {} }
+requestWakeLock();
+document.addEventListener('visibilitychange', function() { if (!document.hidden && wakeLock === null) requestWakeLock(); });
 </script>
 <div class="loading" id="loading"><div class="loading-spin"></div></div>
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(function(){});
-}
-</script>
+<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(function(){});}</script>
 </body>
 </html>
