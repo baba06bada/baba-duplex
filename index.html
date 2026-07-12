@@ -782,8 +782,55 @@ function hlsPlay(videoEl, url, isLive) {
     });
     hlsInstance = hls;
   } else {
+    var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+    var isM3u8 = url.indexOf('.m3u8') > 0;
+    var needsP = needsProxy(url);
     videoEl._fallbackTried = false;
-    videoEl.src = url;
+
+    if (isIOS && isM3u8 && needsP && userProxyUrl) {
+      showNotification('Akis yukleniyor...');
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', userProxyUrl + encodeURIComponent(url), true);
+      xhr.timeout = 15000;
+      xhr.onload = function() {
+        if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
+          var base = url.replace(/\/[^\/]*$/, '/');
+          var lines = xhr.responseText.split('\n');
+          var out = [];
+          for (var i = 0; i < lines.length; i++) {
+            var l = lines[i], t = l.trim();
+            if (!t || t.charAt(0) === '#') { out.push(l); continue; }
+            var abs;
+            if (t.indexOf('http://') === 0 || t.indexOf('https://') === 0) abs = t;
+            else if (t.indexOf('data:') === 0) { out.push(l); continue; }
+            else abs = base + t;
+            if (abs.indexOf('http://') === 0 && userProxyUrl) out.push(userProxyUrl + encodeURIComponent(abs));
+            else out.push(abs);
+          }
+          var blob = new Blob([out.join('\n')], {type:'application/x-mpegurl'});
+          var blobUrl = URL.createObjectURL(blob);
+          videoEl.src = blobUrl;
+          videoEl.load();
+          videoEl.play().catch(function(){});
+          startPlayerUpdate();
+        } else {
+          videoEl.src = userProxyUrl + encodeURIComponent(url);
+          videoEl.load();
+          videoEl.play().catch(function(){});
+          startPlayerUpdate();
+        }
+      };
+      xhr.onerror = function() {
+        videoEl.src = userProxyUrl + encodeURIComponent(url);
+        videoEl.load();
+        videoEl.play().catch(function(){});
+        startPlayerUpdate();
+      };
+      xhr.ontimeout = xhr.onerror;
+      xhr.send();
+    } else {
+    var directUrl = (needsP && userProxyUrl) ? userProxyUrl + encodeURIComponent(url) : url;
+    videoEl.src = directUrl;
     videoEl.load();
     videoEl.addEventListener('loadedmetadata', function() { updateResDisplay(videoEl); detectAvailableTracks(videoEl, null); });
     var tryPlay = function(vid, src) {
@@ -794,16 +841,19 @@ function hlsPlay(videoEl, url, isLive) {
     videoEl.play().catch(function(err){
       if (!videoEl._fallbackTried) {
         videoEl._fallbackTried = true;
-        tryPlay(videoEl, WORKER_URL + encodeURIComponent(url));
+        var fbUrl = (directUrl !== url) ? url : WORKER_URL + encodeURIComponent(url);
+        tryPlay(videoEl, fbUrl);
       }
     });
     videoEl.onerror = function() {
       if (!videoEl._fallbackTried) {
         videoEl._fallbackTried = true;
-        tryPlay(videoEl, WORKER_URL + encodeURIComponent(url));
+        var fbUrl2 = (directUrl !== url) ? url : WORKER_URL + encodeURIComponent(url);
+        tryPlay(videoEl, fbUrl2);
       }
     };
     startPlayerUpdate();
+    }
   }
 
   videoEl.removeEventListener('error', hlsOnError);
