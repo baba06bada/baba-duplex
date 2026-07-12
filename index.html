@@ -368,7 +368,7 @@ html,body{overflow:initial}
 .player-side-panel{width:100%;position:absolute;top:0;left:0;z-index:300;border-left:none}
 .player-side-panel.hidden{display:none}
 .player-layout{-webkit-flex-direction:column;flex-direction:column}
-.player-video-area{height:50%;-webkit-flex:none;flex:none}
+.player-video-area{height:100%;-webkit-flex:none;flex:none}
 .player-overlay{padding:4px 8px 2px}
 .player-top{-webkit-flex-wrap:wrap;flex-wrap:wrap;gap:4px}
 .player-thumb{display:none}
@@ -789,27 +789,7 @@ function hlsPlay(videoEl, url, isLive) {
   } else {
     var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
     var needsP = needsProxy(url);
-    var isM3u8 = url.indexOf('.m3u8') > 0;
-    if (isIOS && isM3u8 && needsP && userProxyUrl) {
-      videoEl._fallbackTried = false;
-      videoEl._guideShown = false;
-      showNotification('M3u8 yukleniyor...');
-      proxyM3u8ForIOS(url, userProxyUrl, function(blobUrl) {
-        if (blobUrl) {
-          videoEl.src = blobUrl;
-          videoEl.load();
-          videoEl.play().catch(function(){});
-          startPlayerUpdate();
-        } else {
-          var directUrl = userProxyUrl + encodeURIComponent(url);
-          videoEl.src = directUrl;
-          videoEl.load();
-          videoEl.play().catch(function(){});
-          startPlayerUpdate();
-        }
-      });
-    } else {
-    var directUrl = (isIOS && needsP && userProxyUrl) ? userProxyUrl + encodeURIComponent(url) : url;
+    var directUrl = (needsP && userProxyUrl) ? userProxyUrl + encodeURIComponent(url) : url;
     videoEl._fallbackTried = false;
     videoEl._guideShown = false;
     videoEl.src = directUrl;
@@ -835,7 +815,6 @@ function hlsPlay(videoEl, url, isLive) {
       }
     };
     startPlayerUpdate();
-    }
   }
 
   videoEl.removeEventListener('error', hlsOnError);
@@ -1232,42 +1211,6 @@ var WORKER_URL = 'https://small-poetry-287c.f3baba06.workers.dev/?url=';
 var userProxyUrl = localStorage.getItem('dp_proxyUrl') || WORKER_URL;
 function needsProxy(url) {
   return url && url.indexOf('http') === 0 && location.protocol === 'https:' && url.indexOf('https:') !== 0;
-}
-
-function proxyM3u8ForIOS(m3u8Url, proxyUrl, callback) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', proxyUrl + encodeURIComponent(m3u8Url), true);
-  xhr.timeout = 15000;
-  xhr.onload = function() {
-    if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
-      var content = xhr.responseText;
-      var baseUrl = m3u8Url.replace(/\/[^\/]*$/, '/');
-      var lines = content.split('\n');
-      var rewritten = [];
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim();
-        if (line === '' || line.charAt(0) === '#') {
-          rewritten.push(line);
-          continue;
-        }
-        if (line.indexOf('http://') === 0 || line.indexOf('https://') === 0) {
-          rewritten.push(proxyUrl + encodeURIComponent(line));
-        } else if (line.indexOf('data:') === 0) {
-          rewritten.push(line);
-        } else {
-          var absUrl = baseUrl + line;
-          rewritten.push(proxyUrl + encodeURIComponent(absUrl));
-        }
-      }
-      var blob = new Blob([rewritten.join('\n')], {type: 'application/x-mpegurl'});
-      callback(URL.createObjectURL(blob));
-    } else {
-      callback(null);
-    }
-  };
-  xhr.onerror = function() { callback(null); };
-  xhr.ontimeout = function() { callback(null); };
-  xhr.send();
 }
 
 function apiRequest(url, callback) {
