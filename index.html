@@ -501,7 +501,7 @@ var state = {
 
 var hlsInstance = null;
 var reconnectAttempts = 0;
-var RECONNECT_MAX = 5;
+var RECONNECT_MAX = 10;
 var reconnecting = false;
 var stallCheckInterval = null;
 var lastPlayheadPosition = -1;
@@ -608,6 +608,7 @@ function hideLoading() {
 
 function stopPlayerEngine() {
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  if (waitingTimer) { clearTimeout(waitingTimer); waitingTimer = null; }
   clearInterval(stallCheckInterval);
   stallCheckInterval = null;
   lastPlayheadPosition = -1;
@@ -636,12 +637,19 @@ function hlsPlay(videoEl, url, isLive) {
 
   if (useHls) {
     var hls = new Hls({
-      maxBufferLength: isLive ? 6 : 30,
-      maxMaxBufferLength: isLive ? 12 : 60,
+      maxBufferLength: isLive ? 4 : 30,
+      maxMaxBufferLength: isLive ? 8 : 60,
       enableWorker: !isTvBrowser,
       lowLatencyMode: isLive,
       liveDurationInfinity: isLive,
-      maxLoadingDelay: isLive ? 4 : 10
+      maxLoadingDelay: isLive ? 2 : 10,
+      manifestLoadingTimeOut: 10000,
+      manifestLoadingMaxRetry: 5,
+      manifestLoadingRetryDelay: 1000,
+      levelLoadingTimeOut: 10000,
+      levelLoadingMaxRetry: 5,
+      fragLoadingTimeOut: 10000,
+      fragLoadingMaxRetry: 5
     });
     hls.loadSource(url);
     hls.attachMedia(videoEl);
@@ -721,9 +729,11 @@ function hlsPlay(videoEl, url, isLive) {
 
   videoEl.removeEventListener('error', hlsOnError);
   videoEl.removeEventListener('stalled', hlsOnStalled);
+  videoEl.removeEventListener('waiting', hlsOnWaiting);
   if (isLive) {
     videoEl.addEventListener('error', hlsOnError);
     videoEl.addEventListener('stalled', hlsOnStalled);
+    videoEl.addEventListener('waiting', hlsOnWaiting);
     videoEl.onclick = function() { togglePlay(); };
   } else {
     videoEl.onclick = null;
@@ -741,37 +751,33 @@ function hlsPlay(videoEl, url, isLive) {
           if (isLive && !reconnecting && reconnectAttempts < RECONNECT_MAX) {
             reconnecting = true;
             reconnectAttempts++;
-            if (reconnectAttempts >= RECONNECT_MAX) {
-              showNotification('Akis dondu! Kanali tekrar secin.');
-              reconnecting = false;
-              return;
-            }
             showNotification('akis dondu, yenileniyor (' + reconnectAttempts + '/' + RECONNECT_MAX + ')...');
             if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
             if (reconnectTimer) { clearTimeout(reconnectTimer); }
-            reconnectTimer = setTimeout(function() { reconnecting = false; hlsPlay(videoEl, url, isLive); }, 2000);
+            reconnectTimer = setTimeout(function() { reconnecting = false; hlsPlay(videoEl, url, isLive); }, 1000);
           }
         }
       } else { videoEl._stallCount = 0; }
       lastPlayheadPosition = cp;
     }
-  }, isLive ? 3000 : 10000);
+  }, isLive ? 1500 : 10000);
 }
 
 function hlsOnError() {
   var el = this;
-  if (el._hlsLive && !reconnecting && reconnectAttempts < RECONNECT_MAX) {
-    reconnecting = true;
-    reconnectAttempts++;
+  if (el._hlsLive && !reconnecting) {
     if (reconnectAttempts >= RECONNECT_MAX) {
-      showNotification('Baglanti basarisiz! Yeniden denemek icin kanali tekrar secin.');
-      reconnecting = false;
+      reconnectAttempts = 0;
+      showNotification('Tekrar deneniyor...');
+      setTimeout(function() { reconnecting = false; hlsPlay(el, el._hlsUrl, el._hlsLive); }, 3000);
       return;
     }
+    reconnecting = true;
+    reconnectAttempts++;
     showNotification('akis hatasi, yenileniyor (' + reconnectAttempts + '/' + RECONNECT_MAX + ')...');
     if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
     if (reconnectTimer) { clearTimeout(reconnectTimer); }
-    reconnectTimer = setTimeout(function() { reconnecting = false; hlsPlay(el, el._hlsUrl, el._hlsLive); }, 2000);
+    reconnectTimer = setTimeout(function() { reconnecting = false; hlsPlay(el, el._hlsUrl, el._hlsLive); }, 1000);
   }
 }
 
@@ -779,20 +785,42 @@ function hlsOnStalled() {
   var el = this;
   try { el.play(); } catch(e) {}
   setTimeout(function() {
-    if (el._hlsLive && el.paused && !reconnecting && reconnectAttempts < RECONNECT_MAX) {
-      reconnecting = true;
-      reconnectAttempts++;
+    if (el._hlsLive && el.paused && !reconnecting) {
       if (reconnectAttempts >= RECONNECT_MAX) {
-        showNotification('Baglanti kesildi! Yeniden denemek icin kanali tekrar secin.');
-        reconnecting = false;
+        reconnectAttempts = 0;
+        showNotification('Tekrar deneniyor...');
+        setTimeout(function() { reconnecting = false; hlsPlay(el, el._hlsUrl, el._hlsLive); }, 3000);
         return;
       }
+      reconnecting = true;
+      reconnectAttempts++;
       showNotification('akis takildi, yenileniyor (' + reconnectAttempts + '/' + RECONNECT_MAX + ')...');
       if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
       if (reconnectTimer) { clearTimeout(reconnectTimer); }
-      reconnectTimer = setTimeout(function() { reconnecting = false; hlsPlay(el, el._hlsUrl, el._hlsLive); }, 2000);
+      reconnectTimer = setTimeout(function() { reconnecting = false; hlsPlay(el, el._hlsUrl, el._hlsLive); }, 1000);
     }
-  }, 3000);
+  }, 2000);
+}
+
+var waitingTimer = null;
+function hlsOnWaiting() {
+  var el = this;
+  if (!el._hlsLive) return;
+  if (waitingTimer) clearTimeout(waitingTimer);
+  waitingTimer = setTimeout(function() {
+    if (el._hlsLive && el.paused && !reconnecting) {
+      if (reconnectAttempts >= RECONNECT_MAX) {
+        reconnectAttempts = 0;
+        setTimeout(function() { reconnecting = false; hlsPlay(el, el._hlsUrl, el._hlsLive); }, 3000);
+        return;
+      }
+      reconnecting = true;
+      reconnectAttempts++;
+      showNotification('buffer hatasi, yenileniyor...');
+      if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+      reconnectTimer = setTimeout(function() { reconnecting = false; hlsPlay(el, el._hlsUrl, el._hlsLive); }, 1000);
+    }
+  }, 5000);
 }
 
 function detectAvailableTracks(videoEl, hls) {
